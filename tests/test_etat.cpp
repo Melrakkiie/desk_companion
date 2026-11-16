@@ -68,9 +68,9 @@ static void test_types_connus_et_inconnus() {
 
 static void test_artiste_vide_par_defaut() {
   etatInit();
-  assert(etatCourant().artiste[0] == '\0');
+  assert(etatCourant().ligne2[0] == '\0');
   etatRecevoir(EV_CLAUDE_DONE, "projet", 0, "quelqu'un");
-  assert(etatCourant().artiste[0] == '\0');  // claude_done ignore l'artiste
+  assert(etatCourant().ligne2[0] == '\0');  // claude_done ignore l'artiste
 }
 
 static void test_push_temporaire_3s_puis_repos() {
@@ -134,7 +134,7 @@ static void test_music_evenement_installe_expression_temporaire() {
   assert(etatRecevoir(EV_MUSIC, "Titre", 100, "Artiste"));
   assert(etatCourant().expression == EXPR_MUSIQUE);
   assert(strcmp(etatCourant().texte, "Titre") == 0);
-  assert(strcmp(etatCourant().artiste, "Artiste") == 0);
+  assert(strcmp(etatCourant().ligne2, "Artiste") == 0);
   assert(!etatMiseAJour(100 + DUREE_MUSIC_MS - 1));
   assert(etatMiseAJour(100 + DUREE_MUSIC_MS));
   assert(etatCourant().expression == EXPR_REPOS);
@@ -143,8 +143,53 @@ static void test_music_evenement_installe_expression_temporaire() {
 static void test_music_sans_artiste() {
   etatInit();
   assert(etatRecevoir(EV_MUSIC, "Titre", 0));
-  assert(etatCourant().artiste[0] == '\0');
+  assert(etatCourant().ligne2[0] == '\0');
   assert(etatCourant().dureeMs == DUREE_MUSIC_MS);
+}
+
+static void test_texte_coupe_au_premier_saut_de_ligne() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nmon_projet", 0);
+  assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
+  assert(strcmp(etatCourant().ligne2, "mon_projet") == 0);
+  etatRecevoir(EV_CLAUDE_DONE, "seul", 0);  // sans '\n' : une seule ligne
+  assert(strcmp(etatCourant().texte, "seul") == 0 && etatCourant().ligne2[0] == '\0');
+  etatRecevoir(EV_CLAUDE_DONE, "a\nb\nc", 0);  // au plus deux lignes : le 2e '\n' coupe la ligne 2
+  assert(strcmp(etatCourant().texte, "a") == 0 && strcmp(etatCourant().ligne2, "b") == 0);
+  etatRecevoir(EV_GIT_PUSH, "a\n\xC3\xA9t\xC3\xA9", 0);  // accents de la ligne 2 convertis en CP437
+  assert(strlen(etatCourant().ligne2) == 3);
+}
+
+static void test_music_saut_de_ligne_l_emporte_sur_artiste() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre\nAutre", 0, "Artiste");
+  assert(strcmp(etatCourant().ligne2, "Autre") == 0);
+}
+
+static void test_chaque_ligne_tronquee_a_100() {
+  assert(TEXTE_MAX == 100);
+  char texte[300];
+  memset(texte, 'x', 150);
+  texte[150] = '\n';
+  memset(texte + 151, 'y', 150 - 1);
+  texte[300 - 1] = '\0';
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, texte, 0);
+  assert(strlen(etatCourant().texte) == 100 && strlen(etatCourant().ligne2) == 100);
+}
+
+static void test_defilement_par_ligne() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "à toi !\nun_nom_de_projet_vraiment_tres_long", 0);
+  assert(etatPeriodeDefilement(etatLargeurTexte(etatCourant().texte)) == 0);  // ligne 1 fixe
+  assert(etatPeriodeDefilement(etatLargeurTexte(etatCourant().ligne2)) > 0);  // ligne 2 défile
+}
+
+static void test_music_duree_avec_deux_lignes_dans_le_texte() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre\nUn titre vraiment très très long pour défiler jusqu'au bout", 0);
+  unsigned long p = etatPeriodeDefilement(etatLargeurTexte(etatCourant().ligne2));
+  assert(etatCourant().dureeMs == 2 * p && p * 2 > DUREE_MUSIC_MS);
 }
 
 static void test_waiting_persistante_ne_revient_jamais_seule() {
@@ -225,9 +270,9 @@ static void test_cp437_accents_francais() {
 static void test_cp437_largeur_en_glyphes_et_troncature() {
   etatRecevoir(EV_CLAUDE_DONE, "été", 0);
   assert(strlen(etatCourant().texte) == 3 && etatLargeurTexte(etatCourant().texte) == 3 * LARGEUR_CHAR_PX);
-  char long40[200] = "";
-  for (int i = 0; i < 50; i++) strcat(long40, "é");
-  etatRecevoir(EV_CLAUDE_DONE, long40, 0);
+  char longTexte[300] = "";
+  for (int i = 0; i < 120; i++) strcat(longTexte, "é");
+  etatRecevoir(EV_CLAUDE_DONE, longTexte, 0);
   assert((int)strlen(etatCourant().texte) == TEXTE_MAX);
 }
 
@@ -248,6 +293,11 @@ int main() {
   test_music_duree_titre_long_deux_defilements();
   test_music_evenement_installe_expression_temporaire();
   test_music_sans_artiste();
+  test_texte_coupe_au_premier_saut_de_ligne();
+  test_music_saut_de_ligne_l_emporte_sur_artiste();
+  test_chaque_ligne_tronquee_a_100();
+  test_defilement_par_ligne();
+  test_music_duree_avec_deux_lignes_dans_le_texte();
   test_waiting_persistante_ne_revient_jamais_seule();
   test_waiting_working_efface();
   test_waiting_working_sans_effet_au_repos();

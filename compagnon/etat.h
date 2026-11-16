@@ -23,13 +23,13 @@ const int BANDEAU_HAUTEUR = 16;     // Bandeau = lignes 0 à 15
 const int ZONE_VISAGE_Y = 16;       // Zone visage = lignes 16 à 63
 const int ZONE_VISAGE_HAUTEUR = 48;
 
-// Défilement du texte du Bandeau (music) : police par défaut, 6 px par caractère à la taille 1.
+// Défilement des lignes du Bandeau (toutes les Expressions) : police par défaut, 6 px par caractère à la taille 1.
 const int LARGEUR_ECRAN_PX = 128;
 const int LARGEUR_CHAR_PX = 6;
 const int VITESSE_DEFILEMENT_PX_S = 30;
 const int ECART_DEFILEMENT_PX = 24;  // blanc entre la fin du texte et sa répétition
 
-const int TEXTE_MAX = 40;  // longueur maximale du texte conservé (le reste est tronqué)
+const int TEXTE_MAX = 100;  // longueur maximale de chaque ligne conservée (le reste est tronqué)
 
 enum TypeEvenement {
   EV_CLAUDE_DONE,
@@ -49,8 +49,8 @@ enum Expression {
 
 struct EtatCourant {
   Expression expression;
-  char texte[TEXTE_MAX + 1];    // texte du Bandeau ("" = vide)
-  char artiste[TEXTE_MAX + 1];  // artiste (music, ticket #8) ; "" si absent
+  char texte[TEXTE_MAX + 1];   // ligne 1 du Bandeau ("" = vide) : le texte jusqu'au premier '\n'
+  char ligne2[TEXTE_MAX + 1];  // ligne 2 : le texte après ce '\n', sinon l'artiste (music) ; "" si absente
   bool temporaire;            // faux : persistante (ou Repos)
   unsigned long debutMs;      // instant où l'Expression a été installée
   unsigned long dureeMs;      // si temporaire : retour au Repos à debutMs + dureeMs
@@ -58,7 +58,7 @@ struct EtatCourant {
 
 // Convertit un texte UTF-8 en CP437 (police de l'écran) : 1 octet = 1 glyphe affiché, donc
 // largeurs et défilement comptent des glyphes. Caractère absent de CP437 -> '?'.
-// Écrit au plus taille-1 glyphes puis '\0'. utf8 peut être nullptr (sortie vide).
+// Écrit au plus taille-1 glyphes puis '\0'. S'arrête au premier '\n'. utf8 peut être nullptr (sortie vide).
 void etatVersCp437(const char* utf8, char* sortie, int taille);
 
 // Traduit le nom d'un type ("claude_done"...) ; faux si le type est inconnu.
@@ -100,5 +100,5 @@ unsigned long etatPeriodeDefilement(int largeurTextePx);
 int etatPositionDefilement(int largeurTextePx, unsigned long tempsMs);
 
 // Durée de l'Expression music : max(10 s, deux défilements de la ligne la plus longue).
-// artiste peut être nullptr.
-unsigned long etatDureeMusique(const char* titre, const char* artiste);
+// ligne2 peut être nullptr.
+unsigned long etatDureeMusique(const char* ligne1, const char* ligne2);
