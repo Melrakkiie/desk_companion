@@ -15,7 +15,7 @@ bool expressionsInit() {
   return ecran.begin(SSD1306_SWITCHCAPVCC, ADRESSE);
 }
 
-void expressionsAfficherNeutre(const char* texteBandeau) {
+void expressionsAfficher(Expression expression, const char* texteBandeau) {
   ecran.clearDisplay();
   ecran.setTextColor(SSD1306_WHITE);
   ecran.setTextSize(1);
@@ -26,11 +26,24 @@ void expressionsAfficherNeutre(const char* texteBandeau) {
     ecran.print(texteBandeau);
   }
 
-  // Zone visage : deux yeux ronds et une bouche droite, centrés dans la zone
   const int centreY = ZONE_VISAGE_Y + ZONE_VISAGE_HAUTEUR / 2;
-  ecran.fillCircle(40, centreY - 6, 7, SSD1306_WHITE);
-  ecran.fillCircle(88, centreY - 6, 7, SSD1306_WHITE);
-  ecran.drawFastHLine(52, centreY + 14, 24, SSD1306_WHITE);
+  if (expression == EXPR_CONTENT) {
+    // Zone visage : yeux en "^" (épais) et grand sourire
+    for (int d = 0; d < 2; d++) {
+      ecran.drawLine(32, centreY - 2 + d, 40, centreY - 10 + d, SSD1306_WHITE);
+      ecran.drawLine(40, centreY - 10 + d, 48, centreY - 2 + d, SSD1306_WHITE);
+      ecran.drawLine(80, centreY - 2 + d, 88, centreY - 10 + d, SSD1306_WHITE);
+      ecran.drawLine(88, centreY - 10 + d, 96, centreY - 2 + d, SSD1306_WHITE);
+    }
+    // Sourire = demi-cercle du bas : on dessine le cercle puis on efface sa moitié haute
+    ecran.drawCircle(64, centreY + 4, 13, SSD1306_WHITE);
+    ecran.fillRect(48, centreY - 10, 33, 14, SSD1306_BLACK);
+  } else {
+    // Repos : deux yeux ronds et une bouche droite, centrés dans la zone
+    ecran.fillCircle(40, centreY - 6, 7, SSD1306_WHITE);
+    ecran.fillCircle(88, centreY - 6, 7, SSD1306_WHITE);
+    ecran.drawFastHLine(52, centreY + 14, 24, SSD1306_WHITE);
+  }
 
   ecran.display();
 }
