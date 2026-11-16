@@ -67,9 +67,16 @@ static void dessinerMusique(const EtatCourant& e, unsigned long maintenantMs) {
   dessinerRepos(e, maintenantMs);
 }
 
-// Ticket #9 : git_push (en attendant : visage de Repos). Temps écoulé : maintenantMs - e.debutMs.
+// git_push : yeux qui regardent vers le haut (pupilles en haut) et flèche qui monte entre eux
 static void dessinerPush(const EtatCourant& e, unsigned long maintenantMs) {
-  dessinerRepos(e, maintenantMs);
+  const int yeuxY = CENTRE_Y - 6;
+  for (int x = 40; x <= 88; x += 48) {
+    ecran.drawCircle(x, yeuxY, 9, SSD1306_WHITE);
+    ecran.fillCircle(x, yeuxY - 4, 4, SSD1306_WHITE);
+  }
+  int haut = etatPushFlecheY(maintenantMs - e.debutMs);  // toujours dans la Zone visage
+  ecran.fillTriangle(64, haut, 56, haut + 9, 72, haut + 9, SSD1306_WHITE);
+  ecran.fillRect(61, haut + 9, 7, PUSH_FLECHE_HAUTEUR - 9, SSD1306_WHITE);
 }
 
 void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigned long maintenantMs) {

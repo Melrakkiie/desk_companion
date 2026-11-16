@@ -1,4 +1,5 @@
 #include "etat.h"
+#include "expressions.h"  // constantes de la Zone visage
 
 #include <string.h>
 
@@ -46,6 +47,9 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
     case EV_CLAUDE_DONE:
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
+    case EV_GIT_PUSH:
+      installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
+      return true;
     // Un case par ticket, à remplir (en attendant : accepté sans effet).
     // Expression persistante : reste jusqu'au prochain Événement.
     // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne
@@ -59,7 +63,6 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
       etatInit();
       return true;
     case EV_MUSIC:          // ticket #8
-    case EV_GIT_PUSH:        // ticket #9
     default:
       return false;
   }
@@ -89,4 +92,10 @@ bool etatYeuxFermes(unsigned long maintenantMs) {
   unsigned long dansCycle = maintenantMs % PERIODE_CLIGNEMENT_MS;
   unsigned long debut = debutClignementDansCycle(cycle);
   return dansCycle >= debut && dansCycle < debut + DUREE_CLIGNEMENT_MS;
+}
+
+int etatPushFlecheY(unsigned long tempsEcouleMs) {
+  int course = ZONE_VISAGE_HAUTEUR - PUSH_FLECHE_HAUTEUR;  // du bas (course) au haut (0)
+  int fait = (int)(tempsEcouleMs % PUSH_CYCLE_MS * course / PUSH_CYCLE_MS);
+  return ZONE_VISAGE_Y + course - fait;
 }

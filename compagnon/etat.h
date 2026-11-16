@@ -5,6 +5,7 @@
 
 // Durées des Expressions temporaires, regroupées ici (les tickets suivants y ajoutent les leurs).
 const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
+const unsigned long DUREE_GIT_PUSH_MS = 3000;
 
 const int TEXTE_MAX = 40;  // longueur maximale du texte conservé (le reste est tronqué)
 
@@ -57,3 +58,9 @@ const unsigned long DUREE_CLIGNEMENT_MS = 150;
 
 // Vrai si les yeux du Repos sont fermés à cet instant.
 bool etatYeuxFermes(unsigned long maintenantMs);
+
+// git_push (ticket #9) : la flèche monte du bas au sommet de la Zone visage, en boucle.
+const int PUSH_FLECHE_HAUTEUR = 20;
+const unsigned long PUSH_CYCLE_MS = 1000;
+// Ordonnée du sommet de la flèche après tempsEcouleMs d'animation (toujours dans la Zone visage).
+int etatPushFlecheY(unsigned long tempsEcouleMs);

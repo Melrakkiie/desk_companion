@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "../compagnon/etat.h"
+#include "../compagnon/expressions.h"  // constantes de la Zone visage (en-tête sans Arduino)
 
 static void test_repos_au_demarrage() {
   etatInit();
@@ -70,6 +71,27 @@ static void test_artiste_vide_par_defaut() {
   assert(etatCourant().artiste[0] == '\0');
   etatRecevoir(EV_CLAUDE_DONE, "projet", 0, "quelqu'un");
   assert(etatCourant().artiste[0] == '\0');  // claude_done ignore l'artiste
+}
+
+static void test_push_temporaire_3s_puis_repos() {
+  etatInit();
+  assert(etatRecevoir(EV_GIT_PUSH, "desk_companion", 1000));
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(strcmp(etatCourant().texte, "desk_companion") == 0);
+  assert(!etatMiseAJour(3999));
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(etatMiseAJour(4000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_push_fleche_reste_dans_zone_visage() {
+  for (unsigned long t = 0; t <= 4000; t += 7) {
+    int haut = etatPushFlecheY(t);
+    assert(haut >= ZONE_VISAGE_Y);
+    assert(haut + PUSH_FLECHE_HAUTEUR - 1 <= ZONE_VISAGE_Y + ZONE_VISAGE_HAUTEUR - 1);
+  }
+  // elle monte : plus haut (y plus petit) à la fin d'un cycle qu'au début
+  assert(etatPushFlecheY(PUSH_CYCLE_MS - 1) < etatPushFlecheY(0));
 }
 
 static void test_waiting_persistante_ne_revient_jamais_seule() {
@@ -149,6 +171,8 @@ int main() {
   test_waiting_working_sans_effet_pendant_done();
   test_waiting_remplace_par_un_autre_evenement();
   test_repos_clignement_ferme_puis_rouvre();
+  test_push_temporaire_3s_puis_repos();
+  test_push_fleche_reste_dans_zone_visage();
   puts("Tous les tests passent.");
   return 0;
 }
