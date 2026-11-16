@@ -109,6 +109,7 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
   ecran.clearDisplay();
   ecran.setTextColor(SSD1306_WHITE);
   ecran.setTextSize(1);
+  ecran.setTextWrap(false);  // un texte trop long est coupé au bord, jamais replié sous le Bandeau
 
   // Bandeau : texte en haut, centré verticalement dans les 16 lignes
   // (la musique dessine son propre Bandeau à 2 lignes)
