@@ -44,6 +44,9 @@ verifie "Notification autorisation -> claude_waiting" \
 verifie "Notification attente -> claude_waiting" \
   '{"hook_event_name":"Notification","notification_type":"idle_prompt","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_waiting","text":"à toi ! mon_projet"}'
+verifie "Notification d'un autre type -> rien envoyé" \
+  '{"hook_event_name":"Notification","notification_type":"auth_success","cwd":"/x/mon_projet"}' \
+  ''
 verifie "UserPromptSubmit -> claude_working" \
   '{"hook_event_name":"UserPromptSubmit","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_working","text":"mon_projet"}'

@@ -14,11 +14,11 @@ case "$(champ .hook_event_name)" in
   Stop) type=claude_done; texte=$projet ;;
   Notification)
     type=claude_waiting
-    if [ "$(champ .notification_type)" = permission_prompt ]; then
-      texte="autorisation ? $projet"
-    else
-      texte="à toi ! $projet"
-    fi ;;
+    case "$(champ .notification_type)" in
+      permission_prompt) texte="autorisation ? $projet" ;;
+      idle_prompt) texte="à toi ! $projet" ;;
+      *) exit 0 ;;  # autres notifications : rien à signaler
+    esac ;;
   UserPromptSubmit | PostToolUse) type=claude_working; texte=$projet ;;
   *) exit 0 ;;
 esac
