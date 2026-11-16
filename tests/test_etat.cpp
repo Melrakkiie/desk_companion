@@ -94,6 +94,47 @@ static void test_push_fleche_reste_dans_zone_visage() {
   assert(etatPushFlecheY(PUSH_CYCLE_MS - 1) < etatPushFlecheY(0));
 }
 
+static void test_waiting_persistante_ne_revient_jamais_seule() {
+  etatInit();
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?", 100));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
+  assert(!etatCourant().temporaire);
+  assert(!etatMiseAJour(100 + 24UL * 3600 * 1000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_waiting_working_efface() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "à toi !", 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 10));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatCourant().texte[0] == '\0');
+}
+
+static void test_waiting_working_sans_effet_au_repos() {
+  etatInit();
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 0));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_waiting_working_sans_effet_pendant_done() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet", 0);
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 10));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strcmp(etatCourant().texte, "projet") == 0);
+  assert(etatCourant().temporaire);
+}
+
+static void test_waiting_remplace_par_un_autre_evenement() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "à toi !", 0);
+  assert(etatRecevoir(EV_CLAUDE_DONE, "fini", 10));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(etatCourant().temporaire);
+}
+
 int main() {
   test_repos_au_demarrage();
   test_claude_done_puis_retour_au_repos_apres_5s();
@@ -102,6 +143,11 @@ int main() {
   test_evenement_sans_texte();
   test_types_connus_et_inconnus();
   test_artiste_vide_par_defaut();
+  test_waiting_persistante_ne_revient_jamais_seule();
+  test_waiting_working_efface();
+  test_waiting_working_sans_effet_au_repos();
+  test_waiting_working_sans_effet_pendant_done();
+  test_waiting_remplace_par_un_autre_evenement();
   test_push_temporaire_3s_puis_repos();
   test_push_fleche_reste_dans_zone_visage();
   puts("Tous les tests passent.");
