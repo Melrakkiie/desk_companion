@@ -5,20 +5,39 @@
 
 static EtatCourant etat;
 
+// Lettres non ASCII disponibles en CP437 : {point de code Unicode, octet CP437}.
+static const struct { unsigned int unicode; unsigned char cp437; } TABLE_CP437[] = {
+  {0xC7, 0x80}, {0xFC, 0x81}, {0xE9, 0x82}, {0xE2, 0x83}, {0xE4, 0x84}, {0xE0, 0x85},
+  {0xE5, 0x86}, {0xE7, 0x87}, {0xEA, 0x88}, {0xEB, 0x89}, {0xE8, 0x8A}, {0xEF, 0x8B},
+  {0xEE, 0x8C}, {0xEC, 0x8D}, {0xC4, 0x8E}, {0xC5, 0x8F}, {0xC9, 0x90}, {0xE6, 0x91},
+  {0xC6, 0x92}, {0xF4, 0x93}, {0xF6, 0x94}, {0xF2, 0x95}, {0xFB, 0x96}, {0xF9, 0x97},
+  {0xFF, 0x98}, {0xD6, 0x99}, {0xDC, 0x9A}, {0xA2, 0x9B}, {0xA3, 0x9C}, {0xA5, 0x9D},
+  {0xE1, 0xA0}, {0xED, 0xA1}, {0xF3, 0xA2}, {0xFA, 0xA3}, {0xF1, 0xA4}, {0xD1, 0xA5},
+  {0xAA, 0xA6}, {0xBA, 0xA7}, {0xBF, 0xA8}, {0xA1, 0xAD}, {0xAB, 0xAE}, {0xBB, 0xAF},
+  {0xDF, 0xE1}, {0xB0, 0xF8},
+};
+
+void etatVersCp437(const char* utf8, char* sortie, int taille) {
+  int n = 0;
+  const unsigned char* p = (const unsigned char*)(utf8 == nullptr ? "" : utf8);
+  while (*p != '\0' && n < taille - 1) {
+    unsigned int c = *p++;
+    int suite = c >= 0xF0 ? 3 : c >= 0xE0 ? 2 : c >= 0xC0 ? 1 : 0;
+    if (c >= 0xC0) c &= 0x3F >> suite;
+    for (int i = 0; i < suite && (*p & 0xC0) == 0x80; i++) c = (c << 6) | (*p++ & 0x3F);
+    unsigned char o = (c >= 0x20 && c <= 0x7E) ? (unsigned char)c : '?';
+    for (const auto& e : TABLE_CP437) if (e.unicode == c) o = e.cp437;
+    sortie[n++] = (char)o;
+  }
+  sortie[n] = '\0';
+}
+
 static void installer(Expression expression, const char* texte, bool temporaire,
                       unsigned long maintenantMs, unsigned long dureeMs,
                       const char* artiste = nullptr) {
   etat.expression = expression;
-  etat.texte[0] = '\0';
-  if (texte != nullptr) {
-    strncpy(etat.texte, texte, TEXTE_MAX);
-    etat.texte[TEXTE_MAX] = '\0';
-  }
-  etat.artiste[0] = '\0';
-  if (artiste != nullptr) {
-    strncpy(etat.artiste, artiste, TEXTE_MAX);
-    etat.artiste[TEXTE_MAX] = '\0';
-  }
+  etatVersCp437(texte, etat.texte, TEXTE_MAX + 1);
+  etatVersCp437(artiste, etat.artiste, TEXTE_MAX + 1);
   etat.temporaire = temporaire;
   etat.debutMs = maintenantMs;
   etat.dureeMs = dureeMs;

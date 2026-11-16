@@ -41,6 +41,11 @@ struct EtatCourant {
   unsigned long dureeMs;      // si temporaire : retour au Repos à debutMs + dureeMs
 };
 
+// Convertit un texte UTF-8 en CP437 (police de l'écran) : 1 octet = 1 glyphe affiché, donc
+// largeurs et défilement comptent des glyphes. Caractère absent de CP437 -> '?'.
+// Écrit au plus taille-1 glyphes puis '\0'. utf8 peut être nullptr (sortie vide).
+void etatVersCp437(const char* utf8, char* sortie, int taille);
+
 // Traduit le nom d'un type ("claude_done"...) ; faux si le type est inconnu.
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type);
 

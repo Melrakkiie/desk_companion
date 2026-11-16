@@ -109,7 +109,8 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
   ecran.clearDisplay();
   ecran.setTextColor(SSD1306_WHITE);
   ecran.setTextSize(1);
-  ecran.setTextWrap(false);  // un texte trop long est coupé au bord, jamais replié sous le Bandeau
+  ecran.cp437(true);         // les textes de l'État sont déjà en CP437 (voir etatVersCp437)
+  ecran.setTextWrap(false); // un texte trop long est coupé au bord, jamais replié sous le Bandeau
 
   // Bandeau : texte en haut, centré verticalement dans les 16 lignes
   // (la musique dessine son propre Bandeau à 2 lignes)
