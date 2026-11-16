@@ -44,9 +44,17 @@ static void dessinerContent(const EtatCourant& e, unsigned long maintenantMs) {
   ecran.fillRect(48, CENTRE_Y - 10, 33, 14, SSD1306_BLACK);
 }
 
-// Ticket #7 : claude_waiting (en attendant : visage de Repos)
+// claude_waiting : grands yeux avec pupilles, sourcils levés, bouche ouverte
 static void dessinerInterpelle(const EtatCourant& e, unsigned long maintenantMs) {
-  dessinerRepos(e, maintenantMs);
+  (void)e;
+  (void)maintenantMs;
+  ecran.drawCircle(40, CENTRE_Y - 4, 9, SSD1306_WHITE);
+  ecran.drawCircle(88, CENTRE_Y - 4, 9, SSD1306_WHITE);
+  ecran.fillCircle(40, CENTRE_Y - 4, 4, SSD1306_WHITE);
+  ecran.fillCircle(88, CENTRE_Y - 4, 4, SSD1306_WHITE);
+  ecran.drawLine(30, CENTRE_Y - 17, 50, CENTRE_Y - 20, SSD1306_WHITE);
+  ecran.drawLine(78, CENTRE_Y - 20, 98, CENTRE_Y - 17, SSD1306_WHITE);
+  ecran.drawCircle(64, CENTRE_Y + 15, 5, SSD1306_WHITE);
 }
 
 // Une ligne du Bandeau : fixe si elle tient, sinon défile en boucle (2 copies côte à côte)

@@ -125,6 +125,47 @@ static void test_music_sans_artiste() {
   assert(etatCourant().dureeMs == DUREE_MUSIC_MS);
 }
 
+static void test_waiting_persistante_ne_revient_jamais_seule() {
+  etatInit();
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?", 100));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
+  assert(!etatCourant().temporaire);
+  assert(!etatMiseAJour(100 + 24UL * 3600 * 1000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_waiting_working_efface() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "à toi !", 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 10));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatCourant().texte[0] == '\0');
+}
+
+static void test_waiting_working_sans_effet_au_repos() {
+  etatInit();
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 0));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_waiting_working_sans_effet_pendant_done() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet", 0);
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 10));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strcmp(etatCourant().texte, "projet") == 0);
+  assert(etatCourant().temporaire);
+}
+
+static void test_waiting_remplace_par_un_autre_evenement() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "à toi !", 0);
+  assert(etatRecevoir(EV_CLAUDE_DONE, "fini", 10));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(etatCourant().temporaire);
+}
+
 int main() {
   test_repos_au_demarrage();
   test_claude_done_puis_retour_au_repos_apres_5s();
@@ -140,6 +181,11 @@ int main() {
   test_music_duree_titre_long_deux_defilements();
   test_music_evenement_installe_expression_temporaire();
   test_music_sans_artiste();
+  test_waiting_persistante_ne_revient_jamais_seule();
+  test_waiting_working_efface();
+  test_waiting_working_sans_effet_au_repos();
+  test_waiting_working_sans_effet_pendant_done();
+  test_waiting_remplace_par_un_autre_evenement();
   puts("Tous les tests passent.");
   return 0;
 }
