@@ -31,7 +31,7 @@ Chaque ligne est tronquée à 100 caractères et défile si elle dépasse l'écr
 
 `compagnon-musique.sh` suit `playerctl --follow metadata` et envoie un Événement `music` (titre, artiste)
 par morceau : pas de renvoi pour le même morceau, ni après une pause. Si le Compagnon est injoignable, le
-script continue ; si `playerctl` s'arrête (aucun lecteur), il le relance toutes les 5 s.
+script continue et renvoie le morceau en cours toutes les 5 s jusqu'à ce que la cible réponde ; si `playerctl` s'arrête (aucun lecteur), il le relance toutes les 5 s.
 Dépendances : `playerctl` (`sudo dnf install playerctl`), `jq`, `curl`. Cible : `COMPAGNON_URL`.
 
 Lancement à l'ouverture de session (service utilisateur systemd ; adapter le chemin dans
