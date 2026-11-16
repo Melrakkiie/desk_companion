@@ -94,6 +94,59 @@ static void test_push_fleche_reste_dans_zone_visage() {
   assert(etatPushFlecheY(PUSH_CYCLE_MS - 1) < etatPushFlecheY(0));
 }
 
+static void test_music_largeur_texte() {
+  assert(etatLargeurTexte("") == 0);
+  assert(etatLargeurTexte("abc") == 3 * LARGEUR_CHAR_PX);
+}
+
+static void test_music_ligne_courte_ne_defile_pas() {
+  const char* t = "123456789012345678901";  // 21 car. = 126 px <= 128
+  assert(etatPeriodeDefilement(etatLargeurTexte(t)) == 0);
+  assert(etatPositionDefilement(etatLargeurTexte(t), 5000) == 0);
+}
+
+static void test_music_position_defilement() {
+  int l = 40 * LARGEUR_CHAR_PX;  // 240 px, ligne qui défile
+  assert(etatPositionDefilement(l, 0) == 0);
+  assert(etatPositionDefilement(l, 1000) == -VITESSE_DEFILEMENT_PX_S);
+  unsigned long p = etatPeriodeDefilement(l);
+  assert(p == (unsigned long)(l + ECART_DEFILEMENT_PX) * 1000 / VITESSE_DEFILEMENT_PX_S);
+  assert(etatPositionDefilement(l, p) == 0);  // boucle exactement
+  assert(etatPositionDefilement(l, p + 1000) == -VITESSE_DEFILEMENT_PX_S);
+  assert(etatPositionDefilement(l, p - 1) < -(l / 2));  // fin de cycle
+}
+
+static void test_music_duree_titre_court() {
+  assert(etatDureeMusique("Titre", "Artiste") == DUREE_MUSIC_MS);
+  assert(etatDureeMusique("Titre", nullptr) == DUREE_MUSIC_MS);
+}
+
+static void test_music_duree_titre_long_deux_defilements() {
+  const char* t = "1234567890123456789012345678901234567890";  // 40 car.
+  unsigned long p = etatPeriodeDefilement(etatLargeurTexte(t));
+  assert(p * 2 > DUREE_MUSIC_MS);
+  assert(etatDureeMusique(t, "Art") == 2 * p);
+  assert(etatDureeMusique("Court", t) == 2 * p);  // la ligne la plus longue peut être l'artiste
+}
+
+static void test_music_evenement_installe_expression_temporaire() {
+  etatInit();
+  assert(etatRecevoir(EV_MUSIC, "Titre", 100, "Artiste"));
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+  assert(strcmp(etatCourant().texte, "Titre") == 0);
+  assert(strcmp(etatCourant().artiste, "Artiste") == 0);
+  assert(!etatMiseAJour(100 + DUREE_MUSIC_MS - 1));
+  assert(etatMiseAJour(100 + DUREE_MUSIC_MS));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_music_sans_artiste() {
+  etatInit();
+  assert(etatRecevoir(EV_MUSIC, "Titre", 0));
+  assert(etatCourant().artiste[0] == '\0');
+  assert(etatCourant().dureeMs == DUREE_MUSIC_MS);
+}
+
 static void test_waiting_persistante_ne_revient_jamais_seule() {
   etatInit();
   assert(etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?", 100));
@@ -165,6 +218,13 @@ int main() {
   test_evenement_sans_texte();
   test_types_connus_et_inconnus();
   test_artiste_vide_par_defaut();
+  test_music_largeur_texte();
+  test_music_ligne_courte_ne_defile_pas();
+  test_music_position_defilement();
+  test_music_duree_titre_court();
+  test_music_duree_titre_long_deux_defilements();
+  test_music_evenement_installe_expression_temporaire();
+  test_music_sans_artiste();
   test_waiting_persistante_ne_revient_jamais_seule();
   test_waiting_working_efface();
   test_waiting_working_sans_effet_au_repos();

@@ -62,9 +62,35 @@ static void dessinerInterpelle(const EtatCourant& e, unsigned long maintenantMs)
   ecran.drawCircle(64, CENTRE_Y + 15, 5, SSD1306_WHITE);
 }
 
-// Ticket #8 : music (en attendant : visage de Repos)
+// Une ligne du Bandeau : fixe si elle tient, sinon défile en boucle (2 copies côte à côte)
+static void ligneDefilante(const char* texte, int y, unsigned long tempsMs) {
+  int largeur = etatLargeurTexte(texte);
+  int x = etatPositionDefilement(largeur, tempsMs);
+  ecran.setCursor(x, y);
+  ecran.print(texte);
+  if (largeur > LARGEUR_ECRAN_PX) {
+    ecran.setCursor(x + largeur + ECART_DEFILEMENT_PX, y);
+    ecran.print(texte);
+  }
+}
+
+// Une croche : tête pleine, hampe, drapeau
+static void dessinerNote(int x, int y) {
+  ecran.fillCircle(x, y, 3, SSD1306_WHITE);
+  ecran.drawFastVLine(x + 3, y - 12, 12, SSD1306_WHITE);
+  ecran.drawLine(x + 3, y - 12, x + 8, y - 8, SSD1306_WHITE);
+}
+
+// music : titre (ligne 1) et artiste (ligne 2) dans le Bandeau, petite police ;
+// visage de Repos entouré de notes qui rebondissent
 static void dessinerMusique(const EtatCourant& e, unsigned long maintenantMs) {
+  unsigned long t = maintenantMs - e.debutMs;
+  ligneDefilante(e.texte, 0, t);
+  ligneDefilante(e.artiste, 8, t);
   dessinerRepos(e, maintenantMs);
+  int rebond = (t / 250) % 2 ? 3 : 0;
+  dessinerNote(14, CENTRE_Y + 4 - rebond);
+  dessinerNote(112, CENTRE_Y - 6 + rebond);
 }
 
 // git_push : yeux qui regardent vers le haut (pupilles en haut) et flèche qui monte entre eux
@@ -85,8 +111,8 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
   ecran.setTextSize(1);
 
   // Bandeau : texte en haut, centré verticalement dans les 16 lignes
-  // (tickets #8 : la musique dessine son propre Bandeau à 2 lignes)
-  if (texteBandeau != nullptr && texteBandeau[0] != '\0') {
+  // (la musique dessine son propre Bandeau à 2 lignes)
+  if (e.expression != EXPR_MUSIQUE && texteBandeau != nullptr && texteBandeau[0] != '\0') {
     ecran.setCursor(2, (BANDEAU_HAUTEUR - 8) / 2);
     ecran.print(texteBandeau);
   }
