@@ -18,7 +18,7 @@ static const struct { unsigned int unicode; unsigned char cp437; } TABLE_CP437[]
 void etatVersCp437(const char* utf8, char* sortie, int taille) {
   int n = 0;
   const unsigned char* p = (const unsigned char*)(utf8 == nullptr ? "" : utf8);
-  while (*p != '\0' && n < taille - 1) {
+  while (*p != '\0' && *p != '\n' && n < taille - 1) {
     unsigned int c = *p++;
     int suite = c >= 0xF0 ? 3 : c >= 0xE0 ? 2 : c >= 0xC0 ? 1 : 0;
     if (c >= 0xC0) c &= 0x3F >> suite;
@@ -35,7 +35,9 @@ static void installer(Expression expression, const char* texte, bool temporaire,
                       const char* artiste = nullptr) {
   etat.expression = expression;
   etatVersCp437(texte, etat.texte, TEXTE_MAX + 1);
-  etatVersCp437(artiste, etat.artiste, TEXTE_MAX + 1);
+  // Ligne 2 : le texte après le premier '\n', sinon l'artiste
+  const char* saut = texte == nullptr ? nullptr : strchr(texte, '\n');
+  etatVersCp437(saut != nullptr ? saut + 1 : artiste, etat.ligne2, TEXTE_MAX + 1);
   etat.temporaire = temporaire;
   etat.debutMs = maintenantMs;
   etat.dureeMs = dureeMs;
@@ -72,9 +74,9 @@ int etatPositionDefilement(int largeurTextePx, unsigned long tempsMs) {
   return -(int)(tempsMs * VITESSE_DEFILEMENT_PX_S / 1000 % cycle);
 }
 
-unsigned long etatDureeMusique(const char* titre, const char* artiste) {
-  unsigned long p1 = etatPeriodeDefilement(etatLargeurTexte(titre));
-  unsigned long p2 = etatPeriodeDefilement(etatLargeurTexte(artiste));
+unsigned long etatDureeMusique(const char* ligne1, const char* ligne2) {
+  unsigned long p1 = etatPeriodeDefilement(etatLargeurTexte(ligne1));
+  unsigned long p2 = etatPeriodeDefilement(etatLargeurTexte(ligne2));
   unsigned long deux = 2 * (p1 > p2 ? p1 : p2);
   return deux > DUREE_MUSIC_MS ? deux : DUREE_MUSIC_MS;
 }
@@ -91,7 +93,7 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
     case EV_MUSIC:
       installer(EXPR_MUSIQUE, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
       // la durée dépend des textes tronqués réellement conservés
-      etat.dureeMs = etatDureeMusique(etat.texte, etat.artiste);
+      etat.dureeMs = etatDureeMusique(etat.texte, etat.ligne2);
       return true;
     // Expression persistante : reste jusqu'au prochain Événement.
     // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne

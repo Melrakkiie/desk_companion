@@ -81,12 +81,9 @@ static void dessinerNote(int x, int y) {
   ecran.drawLine(x + 3, y - 12, x + 8, y - 8, SSD1306_WHITE);
 }
 
-// music : titre (ligne 1) et artiste (ligne 2) dans le Bandeau, petite police ;
-// visage de Repos entouré de notes qui rebondissent
+// music : visage de Repos entouré de notes qui rebondissent (titre et artiste : voir le Bandeau)
 static void dessinerMusique(const EtatCourant& e, unsigned long maintenantMs) {
   unsigned long t = maintenantMs - e.debutMs;
-  ligneDefilante(e.texte, 0, t);
-  ligneDefilante(e.artiste, 8, t);
   dessinerRepos(e, maintenantMs);
   int rebond = (t / NOTE_REBOND_PERIODE_MS) % 2 ? 3 : 0;
   dessinerNote(14, CENTRE_Y + 4 - rebond);
@@ -112,12 +109,12 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
   ecran.cp437(true);         // les textes de l'État sont déjà en CP437 (voir etatVersCp437)
   ecran.setTextWrap(false); // un texte trop long est coupé au bord, jamais replié sous le Bandeau
 
-  // Bandeau : texte en haut, centré verticalement dans les 16 lignes
-  // (la musique dessine son propre Bandeau à 2 lignes)
-  if (e.expression != EXPR_MUSIQUE && texteBandeau != nullptr && texteBandeau[0] != '\0') {
-    ecran.setCursor(2, (BANDEAU_HAUTEUR - 8) / 2);
-    ecran.print(texteBandeau);
-  }
+  // Bandeau, pour toutes les Expressions : une ligne centrée verticalement, ou deux lignes
+  // (y = 0 et 8, police 8 px : rien ne dépasse y = 16). Chaque ligne trop large défile.
+  unsigned long t = maintenantMs - e.debutMs;
+  bool deuxLignes = e.ligne2[0] != '\0';
+  if (texteBandeau != nullptr) ligneDefilante(texteBandeau, deuxLignes ? 0 : (BANDEAU_HAUTEUR - 8) / 2, t);
+  if (deuxLignes) ligneDefilante(e.ligne2, 8, t);
 
   switch (e.expression) {
     case EXPR_CONTENT:    dessinerContent(e, maintenantMs); break;
