@@ -1,0 +1,311 @@
+// Tests du module État sur PC (sans Arduino).
+// Lancer depuis la racine du dépôt :  make test
+#include <cassert>
+#include <cstdio>
+#include <cstring>
+
+#include "../compagnon/etat.h"
+#include "../compagnon/expressions.h"  // constantes de la Zone visage (en-tête sans Arduino)
+
+static void test_repos_au_demarrage() {
+  etatInit();
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatCourant().texte[0] == '\0');
+}
+
+static void test_claude_done_puis_retour_au_repos_apres_5s() {
+  etatInit();
+  assert(etatRecevoir(EV_CLAUDE_DONE, "mon-projet", 1000));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strcmp(etatCourant().texte, "mon-projet") == 0);
+
+  assert(!etatMiseAJour(5999));  // 4,999 s : toujours content
+  assert(etatCourant().expression == EXPR_CONTENT);
+
+  assert(etatMiseAJour(6000));  // 5 s pile : retour au Repos
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatCourant().texte[0] == '\0');
+  assert(!etatMiseAJour(7000));  // plus de changement
+}
+
+static void test_le_dernier_evenement_gagne() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet-a", 0);
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 3000);
+  assert(strcmp(etatCourant().texte, "projet-b") == 0);
+  assert(!etatMiseAJour(5000));  // l'échéance de la 1re requête est oubliée
+  assert(etatMiseAJour(8000));   // 3000 + 5000
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_texte_trop_long_tronque() {
+  etatInit();
+  char long_texte[200];
+  memset(long_texte, 'x', sizeof(long_texte));
+  long_texte[199] = '\0';
+  etatRecevoir(EV_CLAUDE_DONE, long_texte, 0);
+  assert(strlen(etatCourant().texte) == (size_t)TEXTE_MAX);
+}
+
+static void test_evenement_sans_texte() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, nullptr, 0);
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(etatCourant().texte[0] == '\0');
+}
+
+static void test_types_connus_et_inconnus() {
+  TypeEvenement t;
+  assert(etatTypeDepuisNom("claude_done", &t) && t == EV_CLAUDE_DONE);
+  assert(etatTypeDepuisNom("claude_waiting", &t) && t == EV_CLAUDE_WAITING);
+  assert(etatTypeDepuisNom("claude_working", &t) && t == EV_CLAUDE_WORKING);
+  assert(etatTypeDepuisNom("music", &t) && t == EV_MUSIC);
+  assert(etatTypeDepuisNom("git_push", &t) && t == EV_GIT_PUSH);
+  assert(!etatTypeDepuisNom("inconnu", &t));
+  assert(!etatTypeDepuisNom("", &t));
+  assert(!etatTypeDepuisNom(nullptr, &t));
+}
+
+static void test_artiste_vide_par_defaut() {
+  etatInit();
+  assert(etatCourant().ligne2[0] == '\0');
+  etatRecevoir(EV_CLAUDE_DONE, "projet", 0, "quelqu'un");
+  assert(etatCourant().ligne2[0] == '\0');  // claude_done ignore l'artiste
+}
+
+static void test_push_temporaire_3s_puis_repos() {
+  etatInit();
+  assert(etatRecevoir(EV_GIT_PUSH, "desk_companion", 1000));
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(strcmp(etatCourant().texte, "desk_companion") == 0);
+  assert(!etatMiseAJour(3999));
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(etatMiseAJour(4000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_push_fleche_reste_dans_zone_visage() {
+  for (unsigned long t = 0; t <= 4000; t += 7) {
+    int haut = etatPushFlecheY(t);
+    assert(haut >= ZONE_VISAGE_Y);
+    assert(haut + PUSH_FLECHE_HAUTEUR - 1 <= ZONE_VISAGE_Y + ZONE_VISAGE_HAUTEUR - 1);
+  }
+  // elle monte : plus haut (y plus petit) à la fin d'un cycle qu'au début
+  assert(etatPushFlecheY(PUSH_CYCLE_MS - 1) < etatPushFlecheY(0));
+}
+
+static void test_music_largeur_texte() {
+  assert(etatLargeurTexte("") == 0);
+  assert(etatLargeurTexte("abc") == 3 * LARGEUR_CHAR_PX);
+}
+
+static void test_music_ligne_courte_ne_defile_pas() {
+  const char* t = "123456789012345678901";  // 21 car. = 126 px <= 128
+  assert(etatPeriodeDefilement(etatLargeurTexte(t)) == 0);
+  assert(etatPositionDefilement(etatLargeurTexte(t), 5000) == 0);
+}
+
+static void test_music_position_defilement() {
+  int l = 40 * LARGEUR_CHAR_PX;  // 240 px, ligne qui défile
+  assert(etatPositionDefilement(l, 0) == 0);
+  assert(etatPositionDefilement(l, 1000) == -VITESSE_DEFILEMENT_PX_S);
+  unsigned long p = etatPeriodeDefilement(l);
+  assert(p == (unsigned long)(l + ECART_DEFILEMENT_PX) * 1000 / VITESSE_DEFILEMENT_PX_S);
+  assert(etatPositionDefilement(l, p) == 0);  // boucle exactement
+  assert(etatPositionDefilement(l, p + 1000) == -VITESSE_DEFILEMENT_PX_S);
+  assert(etatPositionDefilement(l, p - 1) < -(l / 2));  // fin de cycle
+}
+
+static void test_music_duree_titre_court() {
+  assert(etatDureeMusique("Titre", "Artiste") == DUREE_MUSIC_MS);
+  assert(etatDureeMusique("Titre", nullptr) == DUREE_MUSIC_MS);
+}
+
+static void test_music_duree_titre_long_deux_defilements() {
+  const char* t = "1234567890123456789012345678901234567890";  // 40 car.
+  unsigned long p = etatPeriodeDefilement(etatLargeurTexte(t));
+  assert(p * 2 > DUREE_MUSIC_MS);
+  assert(etatDureeMusique(t, "Art") == 2 * p);
+  assert(etatDureeMusique("Court", t) == 2 * p);  // la ligne la plus longue peut être l'artiste
+}
+
+static void test_music_evenement_installe_expression_temporaire() {
+  etatInit();
+  assert(etatRecevoir(EV_MUSIC, "Titre", 100, "Artiste"));
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+  assert(strcmp(etatCourant().texte, "Titre") == 0);
+  assert(strcmp(etatCourant().ligne2, "Artiste") == 0);
+  assert(!etatMiseAJour(100 + DUREE_MUSIC_MS - 1));
+  assert(etatMiseAJour(100 + DUREE_MUSIC_MS));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_music_sans_artiste() {
+  etatInit();
+  assert(etatRecevoir(EV_MUSIC, "Titre", 0));
+  assert(etatCourant().ligne2[0] == '\0');
+  assert(etatCourant().dureeMs == DUREE_MUSIC_MS);
+}
+
+static void test_texte_coupe_au_premier_saut_de_ligne() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nmon_projet", 0);
+  assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
+  assert(strcmp(etatCourant().ligne2, "mon_projet") == 0);
+  etatRecevoir(EV_CLAUDE_DONE, "seul", 0);  // sans '\n' : une seule ligne
+  assert(strcmp(etatCourant().texte, "seul") == 0 && etatCourant().ligne2[0] == '\0');
+  etatRecevoir(EV_CLAUDE_DONE, "a\nb\nc", 0);  // au plus deux lignes : le 2e '\n' coupe la ligne 2
+  assert(strcmp(etatCourant().texte, "a") == 0 && strcmp(etatCourant().ligne2, "b") == 0);
+  etatRecevoir(EV_GIT_PUSH, "a\n\xC3\xA9t\xC3\xA9", 0);  // accents de la ligne 2 convertis en CP437
+  assert(strlen(etatCourant().ligne2) == 3);
+}
+
+static void test_music_saut_de_ligne_l_emporte_sur_artiste() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre\nAutre", 0, "Artiste");
+  assert(strcmp(etatCourant().ligne2, "Autre") == 0);
+}
+
+static void test_chaque_ligne_tronquee_a_100() {
+  assert(TEXTE_MAX == 100);
+  char texte[300];
+  memset(texte, 'x', 150);
+  texte[150] = '\n';
+  memset(texte + 151, 'y', 150 - 1);
+  texte[300 - 1] = '\0';
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, texte, 0);
+  assert(strlen(etatCourant().texte) == 100 && strlen(etatCourant().ligne2) == 100);
+}
+
+static void test_defilement_par_ligne() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "à toi !\nun_nom_de_projet_vraiment_tres_long", 0);
+  assert(etatPeriodeDefilement(etatLargeurTexte(etatCourant().texte)) == 0);  // ligne 1 fixe
+  assert(etatPeriodeDefilement(etatLargeurTexte(etatCourant().ligne2)) > 0);  // ligne 2 défile
+}
+
+static void test_music_duree_avec_deux_lignes_dans_le_texte() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre\nUn titre vraiment très très long pour défiler jusqu'au bout", 0);
+  unsigned long p = etatPeriodeDefilement(etatLargeurTexte(etatCourant().ligne2));
+  assert(etatCourant().dureeMs == 2 * p && p * 2 > DUREE_MUSIC_MS);
+}
+
+static void test_waiting_persistante_ne_revient_jamais_seule() {
+  etatInit();
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?", 100));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
+  assert(!etatCourant().temporaire);
+  assert(!etatMiseAJour(100 + 24UL * 3600 * 1000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_waiting_working_efface() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "à toi !", 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 10));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatCourant().texte[0] == '\0');
+}
+
+static void test_waiting_working_sans_effet_au_repos() {
+  etatInit();
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 0));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_waiting_working_sans_effet_pendant_done() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet", 0);
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 10));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strcmp(etatCourant().texte, "projet") == 0);
+  assert(etatCourant().temporaire);
+}
+
+static void test_waiting_remplace_par_un_autre_evenement() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "à toi !", 0);
+  assert(etatRecevoir(EV_CLAUDE_DONE, "fini", 10));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(etatCourant().temporaire);
+}
+
+static void test_repos_clignement_ferme_puis_rouvre() {
+  // Sur 20 cycles : yeux ouverts au début de cycle, un seul clignement de la bonne durée par cycle
+  unsigned long debuts[20];
+  for (unsigned long c = 0; c < 20; c++) {
+    unsigned long base = c * PERIODE_CLIGNEMENT_MS;
+    assert(!etatYeuxFermes(base));
+    unsigned long fermes = 0, premier = 0;
+    for (unsigned long t = 0; t < PERIODE_CLIGNEMENT_MS; t++) {
+      if (etatYeuxFermes(base + t)) {
+        if (fermes == 0) premier = t;
+        fermes++;
+      }
+    }
+    assert(fermes == DUREE_CLIGNEMENT_MS);
+    assert(premier >= 1000 && premier <= 3000);
+    debuts[c] = premier;
+  }
+  bool irregulier = false;
+  for (int c = 1; c < 20; c++) irregulier |= (debuts[c] != debuts[0]);
+  assert(irregulier);
+}
+
+static void test_cp437_accents_francais() {
+  char s[16];
+  etatVersCp437("àâäçéèêëîïôöùûü", s, sizeof(s));
+  const unsigned char attendu[] = {0x85, 0x83, 0x84, 0x87, 0x82, 0x8A, 0x88, 0x89,
+                                   0x8C, 0x8B, 0x93, 0x94, 0x97, 0x96, 0x81, 0};
+  assert(memcmp(s, attendu, sizeof(attendu)) == 0);
+  etatVersCp437("ÉÇÜÖÄ", s, sizeof(s));
+  assert((unsigned char)s[0] == 0x90 && (unsigned char)s[1] == 0x80 && strlen(s) == 5);
+  etatVersCp437("À€😀a", s, sizeof(s));  // non disponibles en CP437 -> '?'
+  assert(strcmp(s, "???a") == 0);
+}
+
+static void test_cp437_largeur_en_glyphes_et_troncature() {
+  etatRecevoir(EV_CLAUDE_DONE, "été", 0);
+  assert(strlen(etatCourant().texte) == 3 && etatLargeurTexte(etatCourant().texte) == 3 * LARGEUR_CHAR_PX);
+  char longTexte[300] = "";
+  for (int i = 0; i < 120; i++) strcat(longTexte, "é");
+  etatRecevoir(EV_CLAUDE_DONE, longTexte, 0);
+  assert((int)strlen(etatCourant().texte) == TEXTE_MAX);
+}
+
+int main() {
+  test_cp437_accents_francais();
+  test_cp437_largeur_en_glyphes_et_troncature();
+  test_repos_au_demarrage();
+  test_claude_done_puis_retour_au_repos_apres_5s();
+  test_le_dernier_evenement_gagne();
+  test_texte_trop_long_tronque();
+  test_evenement_sans_texte();
+  test_types_connus_et_inconnus();
+  test_artiste_vide_par_defaut();
+  test_music_largeur_texte();
+  test_music_ligne_courte_ne_defile_pas();
+  test_music_position_defilement();
+  test_music_duree_titre_court();
+  test_music_duree_titre_long_deux_defilements();
+  test_music_evenement_installe_expression_temporaire();
+  test_music_sans_artiste();
+  test_texte_coupe_au_premier_saut_de_ligne();
+  test_music_saut_de_ligne_l_emporte_sur_artiste();
+  test_chaque_ligne_tronquee_a_100();
+  test_defilement_par_ligne();
+  test_music_duree_avec_deux_lignes_dans_le_texte();
+  test_waiting_persistante_ne_revient_jamais_seule();
+  test_waiting_working_efface();
+  test_waiting_working_sans_effet_au_repos();
+  test_waiting_working_sans_effet_pendant_done();
+  test_waiting_remplace_par_un_autre_evenement();
+  test_repos_clignement_ferme_puis_rouvre();
+  test_push_temporaire_3s_puis_repos();
+  test_push_fleche_reste_dans_zone_visage();
+  puts("Tous les tests passent.");
+  return 0;
+}
