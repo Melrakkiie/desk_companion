@@ -1,0 +1,11 @@
+[Unit]
+Description=Compagnon : envoi du morceau en cours (playerctl)
+
+[Service]
+# Chemin à adapter si le dépôt n'est pas dans ~/Projects/esp32/desk_companion
+ExecStart=%h/Projects/esp32/desk_companion/hooks/compagnon-musique.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
