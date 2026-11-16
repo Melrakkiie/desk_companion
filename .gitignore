@@ -1,0 +1,4 @@
+# Identifiants Wi-Fi : jamais dans git (modèle : secrets.example.h)
+secrets.h
+# Sorties de compilation arduino-cli
+build/
