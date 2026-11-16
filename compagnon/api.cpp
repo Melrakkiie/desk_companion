@@ -54,9 +54,14 @@ static void traiterEvenement() {
     repondre(400, "text doit être une chaîne");
     return;
   }
+  if (!doc["artist"].isNull() && !doc["artist"].is<const char*>()) {
+    repondre(400, "artist doit être une chaîne");
+    return;
+  }
 
-  // Le texte trop long est tronqué par le module État.
-  if (etatRecevoir(type, doc["text"] | (const char*)nullptr, millis())) {
+  // Le texte et l'artiste trop longs sont tronqués par le module État.
+  if (etatRecevoir(type, doc["text"] | (const char*)nullptr, millis(),
+                   doc["artist"] | (const char*)nullptr)) {
     expressionChangee = true;
   }
   repondre(200, "événement accepté");

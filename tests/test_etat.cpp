@@ -65,10 +65,11 @@ static void test_types_connus_et_inconnus() {
   assert(!etatTypeDepuisNom(nullptr, &t));
 }
 
-static void test_types_non_dessines_sans_effet() {
+static void test_artiste_vide_par_defaut() {
   etatInit();
-  assert(!etatRecevoir(EV_MUSIC, "titre", 0));
-  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatCourant().artiste[0] == '\0');
+  etatRecevoir(EV_CLAUDE_DONE, "projet", 0, "quelqu'un");
+  assert(etatCourant().artiste[0] == '\0');  // claude_done ignore l'artiste
 }
 
 int main() {
@@ -78,7 +79,7 @@ int main() {
   test_texte_trop_long_tronque();
   test_evenement_sans_texte();
   test_types_connus_et_inconnus();
-  test_types_non_dessines_sans_effet();
+  test_artiste_vide_par_defaut();
   puts("Tous les tests passent.");
   return 0;
 }
