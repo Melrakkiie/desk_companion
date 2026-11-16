@@ -48,3 +48,12 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
 bool etatMiseAJour(unsigned long maintenantMs);
 
 const EtatCourant& etatCourant();
+
+// Clignement du Repos (ticket #6) : sans état, dépend seulement de l'heure.
+// Un clignement par cycle de PERIODE_CLIGNEMENT_MS, à un instant pseudo-aléatoire du cycle
+// (rendu irrégulier mais déterministe, donc testable).
+const unsigned long PERIODE_CLIGNEMENT_MS = 4000;
+const unsigned long DUREE_CLIGNEMENT_MS = 150;
+
+// Vrai si les yeux du Repos sont fermés à cet instant.
+bool etatYeuxFermes(unsigned long maintenantMs);
