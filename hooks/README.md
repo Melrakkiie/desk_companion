@@ -17,8 +17,12 @@ sans toucher aux autres. Vérifier le chemin du script, puis `chmod +x hooks/com
 
 ```
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_done","text":"projet"}' http://compagnon.local/event
-curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_waiting","text":"autorisation ? projet"}' http://compagnon.local/event
+curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_waiting","text":"autorisation ?\nprojet"}' http://compagnon.local/event
+curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_waiting","text":"à toi !\nprojet"}' http://compagnon.local/event
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_working","text":"projet"}' http://compagnon.local/event
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"music","text":"Titre","artist":"Artiste"}' http://compagnon.local/event
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"git_push","text":"main"}' http://compagnon.local/event
 ```
+
+Le `text` s'affiche sur deux lignes du Bandeau au plus : coupé au premier `\n` (ligne 2 = le reste).
+Chaque ligne est tronquée à 100 caractères et défile si elle dépasse l'écran.

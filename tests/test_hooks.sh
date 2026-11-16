@@ -40,10 +40,10 @@ verifie "Stop -> claude_done" \
   '/event application/json {"type":"claude_done","text":"mon_projet"}'
 verifie "Notification autorisation -> claude_waiting" \
   '{"hook_event_name":"Notification","notification_type":"permission_prompt","cwd":"/x/mon_projet"}' \
-  '/event application/json {"type":"claude_waiting","text":"autorisation ? mon_projet"}'
+  '/event application/json {"type":"claude_waiting","text":"autorisation ?\nmon_projet"}'
 verifie "Notification attente -> claude_waiting" \
   '{"hook_event_name":"Notification","notification_type":"idle_prompt","cwd":"/x/mon_projet"}' \
-  '/event application/json {"type":"claude_waiting","text":"à toi ! mon_projet"}'
+  '/event application/json {"type":"claude_waiting","text":"à toi !\nmon_projet"}'
 verifie "Notification d'un autre type -> rien envoyé" \
   '{"hook_event_name":"Notification","notification_type":"auth_success","cwd":"/x/mon_projet"}' \
   ''
