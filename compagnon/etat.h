@@ -5,6 +5,7 @@
 
 // Durées des Expressions temporaires, regroupées ici (les tickets suivants y ajoutent les leurs).
 const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
+const unsigned long DUREE_GIT_PUSH_MS = 3000;
 
 const int TEXTE_MAX = 40;  // longueur maximale du texte conservé (le reste est tronqué)
 

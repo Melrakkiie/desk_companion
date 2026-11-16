@@ -72,6 +72,17 @@ static void test_artiste_vide_par_defaut() {
   assert(etatCourant().artiste[0] == '\0');  // claude_done ignore l'artiste
 }
 
+static void test_push_temporaire_3s_puis_repos() {
+  etatInit();
+  assert(etatRecevoir(EV_GIT_PUSH, "desk_companion", 1000));
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(strcmp(etatCourant().texte, "desk_companion") == 0);
+  assert(!etatMiseAJour(3999));
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(etatMiseAJour(4000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
 int main() {
   test_repos_au_demarrage();
   test_claude_done_puis_retour_au_repos_apres_5s();
@@ -80,6 +91,7 @@ int main() {
   test_evenement_sans_texte();
   test_types_connus_et_inconnus();
   test_artiste_vide_par_defaut();
+  test_push_temporaire_3s_puis_repos();
   puts("Tous les tests passent.");
   return 0;
 }

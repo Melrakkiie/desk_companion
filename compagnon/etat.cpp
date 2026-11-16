@@ -46,11 +46,13 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
     case EV_CLAUDE_DONE:
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
+    case EV_GIT_PUSH:
+      installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
+      return true;
     // Un case par ticket, à remplir (en attendant : accepté sans effet).
     case EV_CLAUDE_WAITING:  // ticket #7
     case EV_CLAUDE_WORKING:  // ticket #7
     case EV_MUSIC:           // ticket #8
-    case EV_GIT_PUSH:        // ticket #9
     default:
       return false;
   }
