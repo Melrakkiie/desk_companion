@@ -47,9 +47,18 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
     // Un case par ticket, à remplir (en attendant : accepté sans effet).
-    case EV_CLAUDE_WAITING:  // ticket #7
-    case EV_CLAUDE_WORKING:  // ticket #7
-    case EV_MUSIC:           // ticket #8
+    // Expression persistante : reste jusqu'au prochain Événement.
+    // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne
+    // (un claude_working d'une session peut effacer le claude_waiting d'une autre).
+    case EV_CLAUDE_WAITING:
+      installer(EXPR_INTERPELLE, texte, false, maintenantMs, 0);
+      return true;
+    // Ramène au Repos seulement si on attend ; sinon sans effet (l'API répond quand même 200).
+    case EV_CLAUDE_WORKING:
+      if (etat.expression != EXPR_INTERPELLE) return false;
+      etatInit();
+      return true;
+    case EV_MUSIC:          // ticket #8
     case EV_GIT_PUSH:        // ticket #9
     default:
       return false;
