@@ -88,7 +88,7 @@ static void dessinerMusique(const EtatCourant& e, unsigned long maintenantMs) {
   ligneDefilante(e.texte, 0, t);
   ligneDefilante(e.artiste, 8, t);
   dessinerRepos(e, maintenantMs);
-  int rebond = (t / 250) % 2 ? 3 : 0;
+  int rebond = (t / NOTE_REBOND_PERIODE_MS) % 2 ? 3 : 0;
   dessinerNote(14, CENTRE_Y + 4 - rebond);
   dessinerNote(112, CENTRE_Y - 6 + rebond);
 }

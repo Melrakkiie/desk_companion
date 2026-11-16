@@ -1,6 +1,4 @@
 #include "etat.h"
-#include "expressions.h"  // constantes de la Zone visage
-
 #include <string.h>
 
 static EtatCourant etat;
@@ -95,7 +93,6 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
       // la durée dépend des textes tronqués réellement conservés
       etat.dureeMs = etatDureeMusique(etat.texte, etat.artiste);
       return true;
-    // Un case par ticket, à remplir (en attendant : accepté sans effet).
     // Expression persistante : reste jusqu'au prochain Événement.
     // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne
     // (un claude_working d'une session peut effacer le claude_waiting d'une autre).
@@ -107,9 +104,8 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
       if (etat.expression != EXPR_INTERPELLE) return false;
       etatInit();
       return true;
-    default:
-      return false;
   }
+  return false;  // inatteignable : tous les types sont traités ci-dessus
 }
 
 bool etatMiseAJour(unsigned long maintenantMs) {
@@ -128,7 +124,7 @@ const EtatCourant& etatCourant() {
 static unsigned long debutClignementDansCycle(unsigned long cycle) {
   unsigned long h = cycle * 2654435761UL;
   h ^= h >> 15;
-  return 1000 + (h % 2001);
+  return CLIGNEMENT_DEBUT_MIN_MS + (h % CLIGNEMENT_DEBUT_PLAGE_MS);
 }
 
 bool etatYeuxFermes(unsigned long maintenantMs) {
