@@ -67,3 +67,17 @@ bool etatMiseAJour(unsigned long maintenantMs) {
 const EtatCourant& etatCourant() {
   return etat;
 }
+
+// Début du clignement dans le cycle : entre 1000 et 3000 ms (hachage du numéro de cycle).
+static unsigned long debutClignementDansCycle(unsigned long cycle) {
+  unsigned long h = cycle * 2654435761UL;
+  h ^= h >> 15;
+  return 1000 + (h % 2001);
+}
+
+bool etatYeuxFermes(unsigned long maintenantMs) {
+  unsigned long cycle = maintenantMs / PERIODE_CLIGNEMENT_MS;
+  unsigned long dansCycle = maintenantMs % PERIODE_CLIGNEMENT_MS;
+  unsigned long debut = debutClignementDansCycle(cycle);
+  return dansCycle >= debut && dansCycle < debut + DUREE_CLIGNEMENT_MS;
+}

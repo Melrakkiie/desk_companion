@@ -72,6 +72,28 @@ static void test_artiste_vide_par_defaut() {
   assert(etatCourant().artiste[0] == '\0');  // claude_done ignore l'artiste
 }
 
+static void test_repos_clignement_ferme_puis_rouvre() {
+  // Sur 20 cycles : yeux ouverts au début de cycle, un seul clignement de la bonne durée par cycle
+  unsigned long debuts[20];
+  for (unsigned long c = 0; c < 20; c++) {
+    unsigned long base = c * PERIODE_CLIGNEMENT_MS;
+    assert(!etatYeuxFermes(base));
+    unsigned long fermes = 0, premier = 0;
+    for (unsigned long t = 0; t < PERIODE_CLIGNEMENT_MS; t++) {
+      if (etatYeuxFermes(base + t)) {
+        if (fermes == 0) premier = t;
+        fermes++;
+      }
+    }
+    assert(fermes == DUREE_CLIGNEMENT_MS);
+    assert(premier >= 1000 && premier <= 3000);
+    debuts[c] = premier;
+  }
+  bool irregulier = false;
+  for (int c = 1; c < 20; c++) irregulier |= (debuts[c] != debuts[0]);
+  assert(irregulier);
+}
+
 int main() {
   test_repos_au_demarrage();
   test_claude_done_puis_retour_au_repos_apres_5s();
@@ -80,6 +102,7 @@ int main() {
   test_evenement_sans_texte();
   test_types_connus_et_inconnus();
   test_artiste_vide_par_defaut();
+  test_repos_clignement_ferme_puis_rouvre();
   puts("Tous les tests passent.");
   return 0;
 }
