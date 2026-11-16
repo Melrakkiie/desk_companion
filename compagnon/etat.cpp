@@ -5,12 +5,18 @@
 static EtatCourant etat;
 
 static void installer(Expression expression, const char* texte, bool temporaire,
-                      unsigned long maintenantMs, unsigned long dureeMs) {
+                      unsigned long maintenantMs, unsigned long dureeMs,
+                      const char* artiste = nullptr) {
   etat.expression = expression;
   etat.texte[0] = '\0';
   if (texte != nullptr) {
     strncpy(etat.texte, texte, TEXTE_MAX);
     etat.texte[TEXTE_MAX] = '\0';
+  }
+  etat.artiste[0] = '\0';
+  if (artiste != nullptr) {
+    strncpy(etat.artiste, artiste, TEXTE_MAX);
+    etat.artiste[TEXTE_MAX] = '\0';
   }
   etat.temporaire = temporaire;
   etat.debutMs = maintenantMs;
@@ -33,14 +39,20 @@ bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
   return false;
 }
 
-bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs) {
-  // Tickets #6 à #9 : ajouter ici un case par type (waiting, working, music, git_push).
+bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
+                  const char* artiste) {
+  (void)artiste;  // ticket #8 : le passer à installer(...)
   switch (type) {
     case EV_CLAUDE_DONE:
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
+    // Un case par ticket, à remplir (en attendant : accepté sans effet).
+    case EV_CLAUDE_WAITING:  // ticket #7
+    case EV_CLAUDE_WORKING:  // ticket #7
+    case EV_MUSIC:           // ticket #8
+    case EV_GIT_PUSH:        // ticket #9
     default:
-      return false;  // accepté par l'API, pas encore dessiné
+      return false;
   }
 }
 
