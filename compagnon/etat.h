@@ -3,10 +3,25 @@
 // l'Expression courante, de son texte et de son échéance. Ne dessine rien.
 #pragma once
 
-// Durées des Expressions temporaires, regroupées ici (les tickets suivants y ajoutent les leurs).
+// ---- Toutes les durées et cadences, regroupées ici ----
+// (hors module : DELAI_NOUVELLE_TENTATIVE_MS dans reseau.cpp et le délai curl du hook,
+// qui relèvent de leur couche.)
 const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
 const unsigned long DUREE_GIT_PUSH_MS = 3000;
 const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
+const unsigned long PERIODE_ANIM_MS = 33;    // redessin périodique (~30 images/s)
+// Clignement du Repos : un par cycle, à un instant irrégulier du cycle.
+const unsigned long PERIODE_CLIGNEMENT_MS = 4000;
+const unsigned long DUREE_CLIGNEMENT_MS = 150;
+const unsigned long CLIGNEMENT_DEBUT_MIN_MS = 1000;    // début du clignement : entre 1000 ms
+const unsigned long CLIGNEMENT_DEBUT_PLAGE_MS = 2001;  // et 3000 ms (2001 valeurs possibles)
+const unsigned long PUSH_CYCLE_MS = 1000;         // git_push : une montée de la flèche
+const unsigned long NOTE_REBOND_PERIODE_MS = 250; // music : les notes changent de position
+
+// Géométrie de l'écran mesurée sur le matériel (ticket #3) : la bande jaune du haut est le Bandeau.
+const int BANDEAU_HAUTEUR = 16;     // Bandeau = lignes 0 à 15
+const int ZONE_VISAGE_Y = 16;       // Zone visage = lignes 16 à 63
+const int ZONE_VISAGE_HAUTEUR = 48;
 
 // Défilement du texte du Bandeau (music) : police par défaut, 6 px par caractère à la taille 1.
 const int LARGEUR_ECRAN_PX = 128;
@@ -41,6 +56,11 @@ struct EtatCourant {
   unsigned long dureeMs;      // si temporaire : retour au Repos à debutMs + dureeMs
 };
 
+// Convertit un texte UTF-8 en CP437 (police de l'écran) : 1 octet = 1 glyphe affiché, donc
+// largeurs et défilement comptent des glyphes. Caractère absent de CP437 -> '?'.
+// Écrit au plus taille-1 glyphes puis '\0'. utf8 peut être nullptr (sortie vide).
+void etatVersCp437(const char* utf8, char* sortie, int taille);
+
 // Traduit le nom d'un type ("claude_done"...) ; faux si le type est inconnu.
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type);
 
@@ -60,15 +80,12 @@ const EtatCourant& etatCourant();
 // Clignement du Repos (ticket #6) : sans état, dépend seulement de l'heure.
 // Un clignement par cycle de PERIODE_CLIGNEMENT_MS, à un instant pseudo-aléatoire du cycle
 // (rendu irrégulier mais déterministe, donc testable).
-const unsigned long PERIODE_CLIGNEMENT_MS = 4000;
-const unsigned long DUREE_CLIGNEMENT_MS = 150;
 
 // Vrai si les yeux du Repos sont fermés à cet instant.
 bool etatYeuxFermes(unsigned long maintenantMs);
 
 // git_push (ticket #9) : la flèche monte du bas au sommet de la Zone visage, en boucle.
 const int PUSH_FLECHE_HAUTEUR = 20;
-const unsigned long PUSH_CYCLE_MS = 1000;
 // Ordonnée du sommet de la flèche après tempsEcouleMs d'animation (toujours dans la Zone visage).
 int etatPushFlecheY(unsigned long tempsEcouleMs);
 

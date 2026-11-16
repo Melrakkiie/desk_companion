@@ -5,6 +5,7 @@
 
 #include "secrets.h"
 
+// Durée réseau, laissée ici (couche Réseau) plutôt que dans etat.h : voir le bloc de durées d'etat.h.
 static const unsigned long DELAI_NOUVELLE_TENTATIVE_MS = 10000;  // 10 s entre deux tentatives
 static const char* NOM_MDNS = "compagnon";                       // => compagnon.local
 

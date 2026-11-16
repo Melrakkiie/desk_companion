@@ -210,7 +210,30 @@ static void test_repos_clignement_ferme_puis_rouvre() {
   assert(irregulier);
 }
 
+static void test_cp437_accents_francais() {
+  char s[16];
+  etatVersCp437("àâäçéèêëîïôöùûü", s, sizeof(s));
+  const unsigned char attendu[] = {0x85, 0x83, 0x84, 0x87, 0x82, 0x8A, 0x88, 0x89,
+                                   0x8C, 0x8B, 0x93, 0x94, 0x97, 0x96, 0x81, 0};
+  assert(memcmp(s, attendu, sizeof(attendu)) == 0);
+  etatVersCp437("ÉÇÜÖÄ", s, sizeof(s));
+  assert((unsigned char)s[0] == 0x90 && (unsigned char)s[1] == 0x80 && strlen(s) == 5);
+  etatVersCp437("À€😀a", s, sizeof(s));  // non disponibles en CP437 -> '?'
+  assert(strcmp(s, "???a") == 0);
+}
+
+static void test_cp437_largeur_en_glyphes_et_troncature() {
+  etatRecevoir(EV_CLAUDE_DONE, "été", 0);
+  assert(strlen(etatCourant().texte) == 3 && etatLargeurTexte(etatCourant().texte) == 3 * LARGEUR_CHAR_PX);
+  char long40[200] = "";
+  for (int i = 0; i < 50; i++) strcat(long40, "é");
+  etatRecevoir(EV_CLAUDE_DONE, long40, 0);
+  assert((int)strlen(etatCourant().texte) == TEXTE_MAX);
+}
+
 int main() {
+  test_cp437_accents_francais();
+  test_cp437_largeur_en_glyphes_et_troncature();
   test_repos_au_demarrage();
   test_claude_done_puis_retour_au_repos_apres_5s();
   test_le_dernier_evenement_gagne();

@@ -64,6 +64,8 @@ static void traiterEvenement() {
                    doc["artist"] | (const char*)nullptr)) {
     expressionChangee = true;
   }
+  Serial.printf("API : événement %s \"%s\"\n", doc["type"].as<const char*>(),
+                doc["text"] | "");
   repondre(200, "événement accepté");
 }
 

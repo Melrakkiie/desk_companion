@@ -7,8 +7,7 @@
 
 static bool dernierEtatWifi = true;  // forcé à l'opposé au premier tour pour dessiner
 
-// Cadence du redessin périodique (~30 images/s), pour les animations des Expressions.
-static const unsigned long PERIODE_ANIM_MS = 33;
+// Cadence du redessin périodique : PERIODE_ANIM_MS (etat.h).
 static unsigned long dernierDessinMs = 0;
 
 static void redessiner(unsigned long maintenantMs) {

@@ -88,7 +88,7 @@ static void dessinerMusique(const EtatCourant& e, unsigned long maintenantMs) {
   ligneDefilante(e.texte, 0, t);
   ligneDefilante(e.artiste, 8, t);
   dessinerRepos(e, maintenantMs);
-  int rebond = (t / 250) % 2 ? 3 : 0;
+  int rebond = (t / NOTE_REBOND_PERIODE_MS) % 2 ? 3 : 0;
   dessinerNote(14, CENTRE_Y + 4 - rebond);
   dessinerNote(112, CENTRE_Y - 6 + rebond);
 }
@@ -109,6 +109,8 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
   ecran.clearDisplay();
   ecran.setTextColor(SSD1306_WHITE);
   ecran.setTextSize(1);
+  ecran.cp437(true);         // les textes de l'État sont déjà en CP437 (voir etatVersCp437)
+  ecran.setTextWrap(false); // un texte trop long est coupé au bord, jamais replié sous le Bandeau
 
   // Bandeau : texte en haut, centré verticalement dans les 16 lignes
   // (la musique dessine son propre Bandeau à 2 lignes)
