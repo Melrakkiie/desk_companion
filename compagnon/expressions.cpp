@@ -23,9 +23,14 @@ static const int CENTRE_Y = ZONE_VISAGE_Y + ZONE_VISAGE_HAUTEUR / 2;
 // Repos : deux yeux ronds et une bouche droite, centrés dans la zone (ticket #6 : clignement)
 static void dessinerRepos(const EtatCourant& e, unsigned long maintenantMs) {
   (void)e;
-  (void)maintenantMs;
-  ecran.fillCircle(40, CENTRE_Y - 6, 7, SSD1306_WHITE);
-  ecran.fillCircle(88, CENTRE_Y - 6, 7, SSD1306_WHITE);
+  if (etatYeuxFermes(maintenantMs)) {
+    // Clignement : yeux réduits à un trait
+    ecran.fillRect(33, CENTRE_Y - 7, 15, 3, SSD1306_WHITE);
+    ecran.fillRect(81, CENTRE_Y - 7, 15, 3, SSD1306_WHITE);
+  } else {
+    ecran.fillCircle(40, CENTRE_Y - 6, 7, SSD1306_WHITE);
+    ecran.fillCircle(88, CENTRE_Y - 6, 7, SSD1306_WHITE);
+  }
   ecran.drawFastHLine(52, CENTRE_Y + 14, 24, SSD1306_WHITE);
 }
 
