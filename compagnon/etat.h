@@ -49,3 +49,9 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
 bool etatMiseAJour(unsigned long maintenantMs);
 
 const EtatCourant& etatCourant();
+
+// git_push (ticket #9) : la flèche monte du bas au sommet de la Zone visage, en boucle.
+const int PUSH_FLECHE_HAUTEUR = 20;
+const unsigned long PUSH_CYCLE_MS = 1000;
+// Ordonnée du sommet de la flèche après tempsEcouleMs d'animation (toujours dans la Zone visage).
+int etatPushFlecheY(unsigned long tempsEcouleMs);

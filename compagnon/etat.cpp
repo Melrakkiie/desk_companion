@@ -1,4 +1,5 @@
 #include "etat.h"
+#include "expressions.h"  // constantes de la Zone visage
 
 #include <string.h>
 
@@ -68,4 +69,10 @@ bool etatMiseAJour(unsigned long maintenantMs) {
 
 const EtatCourant& etatCourant() {
   return etat;
+}
+
+int etatPushFlecheY(unsigned long tempsEcouleMs) {
+  int course = ZONE_VISAGE_HAUTEUR - PUSH_FLECHE_HAUTEUR;  // du bas (course) au haut (0)
+  int fait = (int)(tempsEcouleMs % PUSH_CYCLE_MS * course / PUSH_CYCLE_MS);
+  return ZONE_VISAGE_Y + course - fait;
 }
