@@ -22,8 +22,14 @@ void etatInit() {
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
-  (void)nom;
-  (void)type;
+  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push"};
+  if (nom == nullptr) return false;
+  for (int i = 0; i < 5; i++) {
+    if (strcmp(nom, NOMS[i]) == 0) {
+      *type = (TypeEvenement)i;  // l'ordre de NOMS suit celui de l'enum TypeEvenement
+      return true;
+    }
+  }
   return false;
 }
 

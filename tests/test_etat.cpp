@@ -53,12 +53,32 @@ static void test_evenement_sans_texte() {
   assert(etatCourant().texte[0] == '\0');
 }
 
+static void test_types_connus_et_inconnus() {
+  TypeEvenement t;
+  assert(etatTypeDepuisNom("claude_done", &t) && t == EV_CLAUDE_DONE);
+  assert(etatTypeDepuisNom("claude_waiting", &t) && t == EV_CLAUDE_WAITING);
+  assert(etatTypeDepuisNom("claude_working", &t) && t == EV_CLAUDE_WORKING);
+  assert(etatTypeDepuisNom("music", &t) && t == EV_MUSIC);
+  assert(etatTypeDepuisNom("git_push", &t) && t == EV_GIT_PUSH);
+  assert(!etatTypeDepuisNom("inconnu", &t));
+  assert(!etatTypeDepuisNom("", &t));
+  assert(!etatTypeDepuisNom(nullptr, &t));
+}
+
+static void test_types_non_dessines_sans_effet() {
+  etatInit();
+  assert(!etatRecevoir(EV_MUSIC, "titre", 0));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
 int main() {
   test_repos_au_demarrage();
   test_claude_done_puis_retour_au_repos_apres_5s();
   test_le_dernier_evenement_gagne();
   test_texte_trop_long_tronque();
   test_evenement_sans_texte();
+  test_types_connus_et_inconnus();
+  test_types_non_dessines_sans_effet();
   puts("Tous les tests passent.");
   return 0;
 }
