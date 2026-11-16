@@ -39,17 +39,42 @@ bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
   return false;
 }
 
+int etatLargeurTexte(const char* texte) {
+  return texte == nullptr ? 0 : (int)strlen(texte) * LARGEUR_CHAR_PX;
+}
+
+unsigned long etatPeriodeDefilement(int largeurTextePx) {
+  if (largeurTextePx <= LARGEUR_ECRAN_PX) return 0;
+  return (unsigned long)(largeurTextePx + ECART_DEFILEMENT_PX) * 1000 / VITESSE_DEFILEMENT_PX_S;
+}
+
+int etatPositionDefilement(int largeurTextePx, unsigned long tempsMs) {
+  if (largeurTextePx <= LARGEUR_ECRAN_PX) return 0;
+  unsigned long cycle = largeurTextePx + ECART_DEFILEMENT_PX;
+  return -(int)(tempsMs * VITESSE_DEFILEMENT_PX_S / 1000 % cycle);
+}
+
+unsigned long etatDureeMusique(const char* titre, const char* artiste) {
+  unsigned long p1 = etatPeriodeDefilement(etatLargeurTexte(titre));
+  unsigned long p2 = etatPeriodeDefilement(etatLargeurTexte(artiste));
+  unsigned long deux = 2 * (p1 > p2 ? p1 : p2);
+  return deux > DUREE_MUSIC_MS ? deux : DUREE_MUSIC_MS;
+}
+
 bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
                   const char* artiste) {
-  (void)artiste;  // ticket #8 : le passer à installer(...)
   switch (type) {
     case EV_CLAUDE_DONE:
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
+    case EV_MUSIC:
+      installer(EXPR_MUSIQUE, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
+      // la durée dépend des textes tronqués réellement conservés
+      etat.dureeMs = etatDureeMusique(etat.texte, etat.artiste);
+      return true;
     // Un case par ticket, à remplir (en attendant : accepté sans effet).
     case EV_CLAUDE_WAITING:  // ticket #7
     case EV_CLAUDE_WORKING:  // ticket #7
-    case EV_MUSIC:           // ticket #8
     case EV_GIT_PUSH:        // ticket #9
     default:
       return false;

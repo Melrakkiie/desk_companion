@@ -5,6 +5,13 @@
 
 // Durées des Expressions temporaires, regroupées ici (les tickets suivants y ajoutent les leurs).
 const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
+const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
+
+// Défilement du texte du Bandeau (music) : police par défaut, 6 px par caractère à la taille 1.
+const int LARGEUR_ECRAN_PX = 128;
+const int LARGEUR_CHAR_PX = 6;
+const int VITESSE_DEFILEMENT_PX_S = 30;
+const int ECART_DEFILEMENT_PX = 24;  // blanc entre la fin du texte et sa répétition
 
 const int TEXTE_MAX = 40;  // longueur maximale du texte conservé (le reste est tronqué)
 
@@ -48,3 +55,17 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
 bool etatMiseAJour(unsigned long maintenantMs);
 
 const EtatCourant& etatCourant();
+
+// Largeur en pixels d'une ligne de texte (police fixe, sans GFX).
+int etatLargeurTexte(const char* texte);
+
+// Durée d'un défilement complet (ms) d'une ligne de cette largeur ; 0 si elle tient à l'écran.
+unsigned long etatPeriodeDefilement(int largeurTextePx);
+
+// Décalage horizontal (<= 0) de la ligne à l'instant tempsMs depuis le début ; 0 si elle tient.
+// La ligne se répète à +largeur+ECART_DEFILEMENT_PX pour boucler sans saut.
+int etatPositionDefilement(int largeurTextePx, unsigned long tempsMs);
+
+// Durée de l'Expression music : max(10 s, deux défilements de la ligne la plus longue).
+// artiste peut être nullptr.
+unsigned long etatDureeMusique(const char* titre, const char* artiste);
