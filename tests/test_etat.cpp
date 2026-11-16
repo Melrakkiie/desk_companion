@@ -27,9 +27,38 @@ static void test_claude_done_puis_retour_au_repos_apres_5s() {
   assert(!etatMiseAJour(7000));  // plus de changement
 }
 
+static void test_le_dernier_evenement_gagne() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet-a", 0);
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 3000);
+  assert(strcmp(etatCourant().texte, "projet-b") == 0);
+  assert(!etatMiseAJour(5000));  // l'échéance de la 1re requête est oubliée
+  assert(etatMiseAJour(8000));   // 3000 + 5000
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_texte_trop_long_tronque() {
+  etatInit();
+  char long_texte[200];
+  memset(long_texte, 'x', sizeof(long_texte));
+  long_texte[199] = '\0';
+  etatRecevoir(EV_CLAUDE_DONE, long_texte, 0);
+  assert(strlen(etatCourant().texte) == (size_t)TEXTE_MAX);
+}
+
+static void test_evenement_sans_texte() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, nullptr, 0);
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(etatCourant().texte[0] == '\0');
+}
+
 int main() {
   test_repos_au_demarrage();
   test_claude_done_puis_retour_au_repos_apres_5s();
+  test_le_dernier_evenement_gagne();
+  test_texte_trop_long_tronque();
+  test_evenement_sans_texte();
   puts("Tous les tests passent.");
   return 0;
 }
