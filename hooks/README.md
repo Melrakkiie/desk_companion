@@ -27,6 +27,31 @@ curl -X POST -H 'Content-Type: application/json' -d '{"type":"git_push","text":"
 Le `text` s'affiche sur deux lignes du Bandeau au plus : coupé au premier `\n` (ligne 2 = le reste).
 Chaque ligne est tronquée à 100 caractères et défile si elle dépasse l'écran.
 
+## Push git (hook git global)
+
+`compagnon-push.sh` envoie un Événement `git_push` (`branche` ligne 1, projet ligne 2) après tout push réussi
+qui fait bouger une branche, quel que soit l'outil (terminal, IDE, Claude Code). Un seul Événement par push
+(première branche). Rien pour : push déjà à jour, suppression de branche, tags seuls, push refusé, `fetch`/`pull`.
+Dépendances : `git` récent (hooks par config, testé avec 2.56), `jq`, `curl`. Cible : `COMPAGNON_URL`.
+Les hooks propres à chaque dépôt continuent de s'exécuter.
+
+Installation (adapter le chemin) :
+
+```
+chmod +x hooks/compagnon-push.sh
+git config --global hook.compagnon-push.command "$PWD/hooks/compagnon-push.sh"
+git config --global hook.compagnon-push.event reference-transaction
+```
+
+Retrait :
+
+```
+git config --global --unset hook.compagnon-push.command
+git config --global --unset hook.compagnon-push.event
+```
+
+Limite : Linux uniquement (le script lit `/proc`), et seulement les clients qui utilisent le binaire `git`.
+
 ## Musique (lecteur multimédia)
 
 `compagnon-musique.sh` suit `playerctl --follow metadata` et envoie un Événement `music` (titre, artiste)
