@@ -418,6 +418,11 @@ static void test_son_frequence_fanfare_aux_bornes() {
   etatInit();
   etatRecevoir(EV_GIT_PUSH, nullptr, 10000);
   assert(etatFrequence(10000) == 262);
+  assert(etatFrequence(10000 + 110) == 262);
+  assert(etatFrequence(10000 + 111) == 0);     // silence entre deux notes identiques
+  assert(etatFrequence(10000 + 141) == 262);   // 2e note, détachée
+  assert(etatFrequence(10000 + 393) == 0);     // silence avant la 4e note
+  assert(etatFrequence(10000 + 423) == 262);
   assert(etatFrequence(10000 + 847) == 262);   // fin de la 4e note tenue
   assert(etatFrequence(10000 + 848) == 208);   // frontière
   assert(etatFrequence(10000 + 1273) == 233);

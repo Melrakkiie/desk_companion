@@ -34,8 +34,9 @@ struct Note {
 
 // Fanfare (git_push) : intro de la fanfare de victoire trouvée en ligne, ~3 s.
 // Durées converties du sketch Arduino : 0,85 × 1000 / valeur (6 → 141, 2 → 425, 1 → 850 ms).
+// Notes identiques consécutives séparées par 30 ms de silence (pris sur la note), sinon le buzzer les fond en une.
 const Note MELODIE_FANFARE[] = {
-  {262, 141}, {262, 141}, {262, 141}, {262, 425},
+  {262, 111}, {0, 30}, {262, 111}, {0, 30}, {262, 111}, {0, 30}, {262, 425},
   {208, 425}, {233, 425}, {262, 141}, {0, 141}, {233, 141}, {262, 850},
 };
 // Carillon (claude_waiting) : ding-dong descendant, < 0,5 s.
