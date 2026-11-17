@@ -53,6 +53,7 @@ printf '"libraryfolders"\n{\n\t"0"\n\t{\n\t\t"path"\t\t"%s"\n\t}\n\t"1"\n\t{\n\t
 printf '"AppState"\n{\n\t"appid"\t\t"111"\n\t"name"\t\t"Café \\"Noir\\" Été"\n}\n' > "$STEAM/steamapps/appmanifest_111.acf"
 printf '"AppState"\n{\n\t"name"\t\t"Rivals of Aether II"\n}\n' > "$TMP/lib2/steamapps/appmanifest_222.acf"
 printf '"AppState"\n{\n\t"name"\t\t"Proton Experimental"\n}\n' > "$STEAM/steamapps/appmanifest_1493710.acf"
+printf '"AppState"\n{\n\t"name"\t\t"A\\\\B"\n}\n' > "$STEAM/steamapps/appmanifest_444.acf"
 export COMPAGNON_JEU_STEAM_DIR=$STEAM COMPAGNON_JEU_RENVOI_S=30 COMPAGNON_JEU_SCAN_S=0.1
 
 # Cas : source factice, première annonce attendue (ligne unique de journal).
@@ -77,6 +78,9 @@ cas 2 "manifest dans la 2e bibliothèque" '/event application/json {"type":"game
 
 proc "/opt/steam/reaper" SteamLaunch AppId=333 -- /jeu > "$TMP/procs"
 cas 3 "manifest introuvable : Steam <id>" '/event application/json {"type":"game","text":"Steam 333"}'
+
+proc "/opt/steam/reaper" SteamLaunch AppId=444 -- /jeu > "$TMP/procs"
+cas 12 "manifest avec antislash : \\\\ devient \\" '/event application/json {"type":"game","text":"A\\B"}'
 
 { proc /usr/bin/steam; proc "/opt/steam/reaper" SteamLaunch AppId=1493710 -- /proton; proc /usr/bin/bash; } > "$TMP/procs"
 cas 4 "client Steam et outils seulement : game_stop" '/event application/json {"type":"game_stop"}'
