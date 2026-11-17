@@ -54,6 +54,44 @@ static void test_evenement_sans_texte() {
   assert(etatCourant().texte[0] == '\0');
 }
 
+static void test_game_au_repos_affiche_jeu_puis_game_stop_ramene_au_repos() {
+  etatInit();
+  TypeEvenement t;
+  assert(etatTypeDepuisNom("game", &t) && t == EV_GAME);
+  assert(etatTypeDepuisNom("game_stop", &t) && t == EV_GAME_STOP);
+  assert(etatRecevoir(EV_GAME, "Hollow Knight", 1000));
+  assert(etatCourant().expression == EXPR_JEU);
+  assert(strcmp(etatCourant().texte, "Hollow Knight") == 0);
+  assert(etatCourant().ligne2[0] == '\0');
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(20000));  // persistante
+  assert(etatRecevoir(EV_GAME_STOP, nullptr, 21000));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(!etatRecevoir(EV_GAME_STOP, nullptr, 22000));  // déjà au Repos
+}
+
+static void test_game_nom_different_sur_place_meme_nom_sans_effet() {
+  etatInit();
+  etatRecevoir(EV_GAME, "Jeu A", 1000);
+  assert(!etatRecevoir(EV_GAME, "Jeu A", 11000));
+  assert(etatCourant().debutMs == 1000);  // défilement non relancé
+  assert(etatRecevoir(EV_GAME, "Jeu B", 12000));
+  assert(etatCourant().expression == EXPR_JEU);
+  assert(strcmp(etatCourant().texte, "Jeu B") == 0);
+  assert(etatCourant().debutMs == 12000);  // défilement repris du début
+}
+
+static void test_game_nom_cp437_et_tronque() {
+  etatInit();
+  etatRecevoir(EV_GAME, "Pok\xC3\xA9mon", 0);
+  assert(strcmp(etatCourant().texte, "Pok\x82mon") == 0);
+  char long_texte[200];
+  memset(long_texte, 'x', sizeof(long_texte));
+  long_texte[199] = '\0';
+  etatRecevoir(EV_GAME, long_texte, 1);
+  assert(strlen(etatCourant().texte) == (size_t)TEXTE_MAX);
+}
+
 static void test_types_connus_et_inconnus() {
   TypeEvenement t;
   assert(etatTypeDepuisNom("claude_done", &t) && t == EV_CLAUDE_DONE);
@@ -543,6 +581,9 @@ int main() {
   test_texte_trop_long_tronque();
   test_evenement_sans_texte();
   test_types_connus_et_inconnus();
+  test_game_au_repos_affiche_jeu_puis_game_stop_ramene_au_repos();
+  test_game_nom_different_sur_place_meme_nom_sans_effet();
+  test_game_nom_cp437_et_tronque();
   test_artiste_vide_par_defaut();
   test_music_largeur_texte();
   test_music_ligne_courte_ne_defile_pas();
