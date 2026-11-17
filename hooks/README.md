@@ -35,23 +35,27 @@ qui fait bouger une branche, quel que soit l'outil (terminal, IDE, Claude Code).
 Dépendances : `git` récent (hooks par config, testé avec 2.56), `jq`, `curl`. Cible : `COMPAGNON_URL`.
 Les hooks propres à chaque dépôt continuent de s'exécuter.
 
-Installation (adapter le chemin) :
+Installation, depuis la racine du dépôt :
 
 ```
-chmod +x hooks/compagnon-push.sh
-git config --global hook.compagnon-push.command "$PWD/hooks/compagnon-push.sh"
+mkdir -p ~/.local/bin
+install -m 755 hooks/compagnon-push.sh ~/.local/bin/
+git config --global hook.compagnon-push.command "$HOME/.local/bin/compagnon-push.sh"
 git config --global hook.compagnon-push.event reference-transaction
 ```
 
-**Attention** : le chemin doit rester valide. Si le script disparaît (dépôt déplacé, branche sans le script
-extraite…), git échoue partout (`commit`, `init`, `push`…) avec « la mise à jour a été abandonnée par le
-crochet reference-transaction ». Dans ce cas, retirer le hook (ci-dessous) ou corriger le chemin.
+Le hook pointe vers une copie hors du dépôt : ne pas le faire pointer vers `hooks/compagnon-push.sh`. Si le
+script disparaît (branche ou commit sans le script extrait, dépôt déplacé…), git échoue partout (`commit`,
+`checkout`, `pull`…) avec « la mise à jour a été abandonnée par le crochet reference-transaction ». Dans ce
+cas, retirer le hook (ci-dessous) ou corriger le chemin. Après une modification du script, relancer la
+commande `install`.
 
 Retrait :
 
 ```
 git config --global --unset hook.compagnon-push.command
 git config --global --unset hook.compagnon-push.event
+rm ~/.local/bin/compagnon-push.sh
 ```
 
 Limite : Linux uniquement (le script lit `/proc`), et seulement les clients qui utilisent le binaire `git`.
