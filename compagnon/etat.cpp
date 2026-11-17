@@ -3,7 +3,8 @@
 
 static EtatCourant etat;  // l'Expression courante, que le Rappel recouvre sans la toucher
 
-// Rappel (appui sur le Bouton) et Morceau courant : le dernier music reçu (copie de etat).
+// Rappel (appui sur le Bouton) et Morceau connu : le dernier music reçu, en pause compris (copie de etat) ;
+// seul un Morceau connu non en pause est le Morceau courant (voir GLOSSARY.md).
 static EtatCourant rappel;
 static bool rappelActif = false;
 static EtatCourant morceau;
@@ -89,14 +90,19 @@ unsigned int etatFrequence(unsigned long maintenantMs) {
   return etatFrequenceSon(sonCourant, maintenantMs - sonDebutMs);
 }
 
+// Les deux lignes du Bandeau en CP437 : ligne 1 = texte jusqu'au premier '\n' ; ligne 2 = le texte
+// après ce '\n', sinon l'artiste. texte et artiste peuvent être nullptr.
+static void lignesBandeau(const char* texte, const char* artiste, char* l1, char* l2) {
+  etatVersCp437(texte, l1, TEXTE_MAX + 1);
+  const char* saut = texte == nullptr ? nullptr : strchr(texte, '\n');
+  etatVersCp437(saut != nullptr ? saut + 1 : artiste, l2, TEXTE_MAX + 1);
+}
+
 static void installer(Expression expression, const char* texte, bool temporaire,
                       unsigned long maintenantMs, unsigned long dureeMs,
                       const char* artiste = nullptr) {
   etat.expression = expression;
-  etatVersCp437(texte, etat.texte, TEXTE_MAX + 1);
-  // Ligne 2 : le texte après le premier '\n', sinon l'artiste
-  const char* saut = texte == nullptr ? nullptr : strchr(texte, '\n');
-  etatVersCp437(saut != nullptr ? saut + 1 : artiste, etat.ligne2, TEXTE_MAX + 1);
+  lignesBandeau(texte, artiste, etat.texte, etat.ligne2);
   etat.temporaire = temporaire;
   etat.debutMs = maintenantMs;
   etat.dureeMs = dureeMs;
@@ -107,13 +113,13 @@ static void repos() {
   installer(EXPR_REPOS, nullptr, false, 0, 0);
 }
 
-void etatInit() {
+void etatInit(bool boutonEnfonceAuDemarrage) {
   repos();
   sonCourant = SON_AUCUN;
   rappelActif = false;
   morceauConnu = false;
   morceauEnPause = false;
-  boutonEnfonce = false;
+  boutonEnfonce = boutonEnfonceAuDemarrage;  // tenu au démarrage : pas de front d'appui
   boutonChangement = false;
 }
 
@@ -166,9 +172,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       oublierSiPerime(maintenantMs);
       nouvellesMusiqueMs = maintenantMs;
       char l1[TEXTE_MAX + 1], l2[TEXTE_MAX + 1];
-      const char* saut = texte == nullptr ? nullptr : strchr(texte, '\n');
-      etatVersCp437(texte, l1, TEXTE_MAX + 1);
-      etatVersCp437(saut != nullptr ? saut + 1 : artiste, l2, TEXTE_MAX + 1);
+      lignesBandeau(texte, artiste, l1, l2);
       if (morceauConnu && strcmp(l1, morceau.texte) == 0 && strcmp(l2, morceau.ligne2) == 0) {
         morceauEnPause = false;
         return false;
