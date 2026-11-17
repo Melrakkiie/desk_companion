@@ -6,12 +6,21 @@
 # Cible : http://compagnon.local, remplaçable par la variable COMPAGNON_URL (tests).
 # Sort toujours en succès : un échec à l'étape `prepared` annulerait la mise à jour des refs.
 
+# Durée du hook, laissée ici (couche hook) plutôt que dans etat.h : voir le bloc de durées d'etat.h.
 delai_curl_s=2  # abandonne la requête après 2 s (le script, lui, rend la main tout de suite)
 
 [ "$1" = prepared ] || exit 0
 # Le processus parent doit être un `git push` (écarte fetch/pull, qui mettent aussi à jour ces refs).
-# shortcut: tout argument égal à "push" suffit, e.g. `git commit -m push` passerait, mais ne touche pas les refs distantes.
-tr '\0' '\n' < "/proc/$PPID/cmdline" 2>/dev/null | grep -qx push || exit 0
+mapfile -d '' args < "/proc/$PPID/cmdline" 2>/dev/null || exit 0
+sous_commande=
+for ((i = 1; i < ${#args[@]}; i++)); do   # args[0] = git ; on saute les options globales
+  case ${args[i]} in
+    -c | -C | --git-dir | --work-tree | --namespace) ((i++)) ;;  # la valeur est l'argument suivant
+    -*) ;;
+    *) sous_commande=${args[i]}; break ;;
+  esac
+done
+[ "$sous_commande" = push ] || exit 0
 
 nul=0000000000000000000000000000000000000000
 branche=
@@ -26,8 +35,9 @@ done
 
 # Un push de plusieurs branches ouvre une transaction par ref : un seul Événement par processus push
 # (pid + instant de démarrage), marqué par un dossier créé de façon atomique.
-marque=${TMPDIR:-/tmp}/compagnon-push-$PPID-$(cut -d' ' -f22 "/proc/$PPID/stat" 2>/dev/null)
-find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'compagnon-push-*' -mmin +5 -exec rmdir {} + 2>/dev/null
+dossier_marques=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}  # dossier propre à l'utilisateur, pas /tmp partagé
+marque=$dossier_marques/compagnon-push-$PPID-$(cut -d' ' -f22 "/proc/$PPID/stat" 2>/dev/null)
+find "$dossier_marques" -maxdepth 1 -name 'compagnon-push-*' -mmin +5 -exec rmdir {} + 2>/dev/null
 mkdir "$marque" 2>/dev/null || exit 0
 
 projet=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")

@@ -98,7 +98,7 @@ Son etatSonCourant();
 // Fréquence à jouer maintenant pour le Son courant (0 = silence).
 unsigned int etatFrequence(unsigned long maintenantMs);
 
-// Remet l'État au Repos.
+// Remet l'État au Repos et le Son à SON_AUCUN.
 void etatInit();
 
 // Applique un Événement (le dernier gagne). Renvoie vrai si l'Expression a changé.

@@ -1,5 +1,5 @@
 // Compagnon de bureau : programme principal.
-// Assemble les modules Réseau, API, État et Expressions. Aucun delay() : la boucle tourne librement.
+// Assemble les modules Réseau, API, État, Expressions et Buzzer. Aucun delay() : la boucle tourne librement.
 #include "api.h"
 #include "buzzer.h"
 #include "etat.h"

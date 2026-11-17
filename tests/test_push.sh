@@ -76,6 +76,12 @@ verifie "push refusé (non fast-forward) : rien" "" git push origin main
 # fetch qui ramène des commits : rien
 verifie "fetch qui ramène des commits : rien" "" git fetch origin
 
+# "push" n'est pas le sous-commande : `git -C push fetch` (dossier nommé push) ne doit rien envoyer
+git clone -q "$TMP/distant.git" "$TMP/push"
+( cd "$TMP/autre"; git checkout -q -b cote; echo y >> f; git commit -qam autre2; git push -q origin cote ) >/dev/null 2>&1
+sleep 0.6  # l'envoi du push ci-dessus ne doit pas tomber dans le journal du test
+verifie "fetch avec un argument « push » : rien" "" env -C "$TMP" git -C push fetch origin
+
 # distant inexistant
 git remote add fantome "$TMP/nulle_part.git"
 verifie "distant inexistant : rien" "" git push fantome main
