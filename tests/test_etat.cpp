@@ -92,6 +92,69 @@ static void test_game_nom_cp437_et_tronque() {
   assert(strlen(etatCourant().texte) == (size_t)TEXTE_MAX);
 }
 
+static void test_game_pendant_waiting_puis_working_mene_a_jeu() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "projet", 0);
+  assert(!etatRecevoir(EV_GAME, "Jeu", 1000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(etatSonCourant() == SON_CARILLON);  // Son non interrompu
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 2000));
+  assert(etatCourant().expression == EXPR_JEU);
+}
+
+static void test_game_et_game_stop_pendant_expression_temporaire() {
+  etatInit();
+  etatRecevoir(EV_GIT_PUSH, "p", 0);
+  assert(!etatRecevoir(EV_GAME, "Jeu", 500));
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(etatSonCourant() == SON_FANFARE);
+  assert(etatMiseAJour(DUREE_GIT_PUSH_MS));
+  assert(etatCourant().expression == EXPR_JEU);
+  assert(strcmp(etatCourant().texte, "Jeu") == 0);
+
+  etatRecevoir(EV_CLAUDE_DONE, "p", 4000);
+  assert(!etatRecevoir(EV_GAME_STOP, nullptr, 4500));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(etatMiseAJour(4000 + DUREE_CLAUDE_DONE_MS));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_oubli_du_jeu_apres_30s_et_pas_avant() {
+  etatInit();
+  etatRecevoir(EV_GAME, "Jeu", 0);
+  assert(!etatMiseAJour(OUBLI_JEU_MS - 1));
+  assert(etatCourant().expression == EXPR_JEU);
+  assert(etatRecevoir(EV_GAME, "Jeu", 10000) == false);  // un renvoi repousse l'oubli
+  assert(!etatMiseAJour(10000 + OUBLI_JEU_MS - 1));
+  assert(etatMiseAJour(10000 + OUBLI_JEU_MS));
+  assert(etatCourant().expression == EXPR_REPOS);
+  // oublié pendant une Expression temporaire : retour au Repos à son expiration
+  etatRecevoir(EV_GAME, "Jeu", 100000);
+  etatRecevoir(EV_MUSIC, "T", 100000 + OUBLI_JEU_MS - 2000, "A");
+  assert(!etatMiseAJour(100000 + OUBLI_JEU_MS));
+  etatMiseAJour(100000 + OUBLI_JEU_MS - 2000 + DUREE_MUSIC_MS);
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_rappel_pendant_jeu_revient_a_jeu_et_game_ne_le_coupe_pas() {
+  etatInit();
+  etatRecevoir(EV_GAME, "Jeu", 0);
+  assert(etatBouton(true, 1000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(!etatRecevoir(EV_GAME, "Jeu", 1500));
+  assert(!etatRecevoir(EV_GAME, "Autre", 1600));
+  assert(!etatRecevoir(EV_GAME_STOP, nullptr, 1700));
+  assert(etatCourant().expression == EXPR_SILENCE);  // Rappel intact
+  assert(etatMiseAJour(1000 + DUREE_SILENCE_MS));
+  assert(etatCourant().expression == EXPR_REPOS);    // game_stop a ramené Repos dessous
+  etatBouton(false, 5000);
+  etatInit();
+  etatRecevoir(EV_GAME, "Jeu", 0);
+  etatBouton(true, 1000);
+  assert(etatMiseAJour(1000 + DUREE_SILENCE_MS));
+  assert(etatCourant().expression == EXPR_JEU);
+}
+
 static void test_types_connus_et_inconnus() {
   TypeEvenement t;
   assert(etatTypeDepuisNom("claude_done", &t) && t == EV_CLAUDE_DONE);
@@ -584,6 +647,10 @@ int main() {
   test_game_au_repos_affiche_jeu_puis_game_stop_ramene_au_repos();
   test_game_nom_different_sur_place_meme_nom_sans_effet();
   test_game_nom_cp437_et_tronque();
+  test_game_pendant_waiting_puis_working_mene_a_jeu();
+  test_game_et_game_stop_pendant_expression_temporaire();
+  test_oubli_du_jeu_apres_30s_et_pas_avant();
+  test_rappel_pendant_jeu_revient_a_jeu_et_game_ne_le_coupe_pas();
   test_artiste_vide_par_defaut();
   test_music_largeur_texte();
   test_music_ligne_courte_ne_defile_pas();
