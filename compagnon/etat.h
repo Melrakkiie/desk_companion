@@ -18,6 +18,25 @@ const unsigned long CLIGNEMENT_DEBUT_PLAGE_MS = 2001;  // et 3000 ms (2001 valeu
 const unsigned long PUSH_CYCLE_MS = 1000;         // git_push : une montée de la flèche
 const unsigned long NOTE_REBOND_PERIODE_MS = 250; // music : les notes changent de position
 
+// Mélodies des Sons : {fréquence Hz, durée ms}, fréquence 0 = silence.
+// Faciles à remplacer : coller ici ses propres notes (le reste suit tout seul).
+struct Note {
+  unsigned int frequenceHz;
+  unsigned long dureeMs;
+};
+
+// Fanfare (git_push) : composition originale, ~3 s. Arpège montant, deux phrases, notes répétées, accord final tenu.
+const Note MELODIE_FANFARE[] = {
+  {523, 120}, {659, 120}, {784, 120}, {1047, 240}, {0, 60},
+  {784, 120}, {880, 120}, {988, 120}, {1175, 240}, {0, 60},
+  {1047, 150}, {0, 30}, {1047, 150}, {0, 30}, {1047, 150}, {0, 30},
+  {1319, 300}, {1568, 300}, {1047, 540},
+};
+// Carillon (claude_waiting) : ding-dong descendant, < 0,5 s.
+const Note MELODIE_CARILLON[] = {
+  {988, 150}, {0, 30}, {784, 250},
+};
+
 // Géométrie de l'écran mesurée sur le matériel (ticket #3) : la bande jaune du haut est le Bandeau.
 const int BANDEAU_HAUTEUR = 16;     // Bandeau = lignes 0 à 15
 const int ZONE_VISAGE_Y = 16;       // Zone visage = lignes 16 à 63
@@ -63,6 +82,21 @@ void etatVersCp437(const char* utf8, char* sortie, int taille);
 
 // Traduit le nom d'un type ("claude_done"...) ; faux si le type est inconnu.
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type);
+
+enum Son { SON_AUCUN, SON_FANFARE, SON_CARILLON };
+
+// Durée totale d'un Son (ms) ; 0 pour SON_AUCUN.
+unsigned long etatDureeSon(Son son);
+
+// Fréquence (Hz) à jouer pour ce Son après tempsEcouleMs ; 0 = silence ou Son terminé.
+unsigned int etatFrequenceSon(Son son, unsigned long tempsEcouleMs);
+
+// Son en cours (ou terminé : seule la fréquence 0 le dit) ; démarré par claude_waiting et git_push,
+// jamais interrompu par les autres Événements.
+Son etatSonCourant();
+
+// Fréquence à jouer maintenant pour le Son courant (0 = silence).
+unsigned int etatFrequence(unsigned long maintenantMs);
 
 // Remet l'État au Repos.
 void etatInit();
