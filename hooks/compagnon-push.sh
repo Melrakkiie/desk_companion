@@ -24,6 +24,12 @@ while read -r _ nouveau ref; do
 done
 [ -n "$branche" ] || exit 0
 
+# Un push de plusieurs branches ouvre une transaction par ref : un seul Événement par processus push
+# (pid + instant de démarrage), marqué par un dossier créé de façon atomique.
+marque=${TMPDIR:-/tmp}/compagnon-push-$PPID-$(cut -d' ' -f22 "/proc/$PPID/stat" 2>/dev/null)
+find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'compagnon-push-*' -mmin +5 -exec rmdir {} + 2>/dev/null
+mkdir "$marque" 2>/dev/null || exit 0
+
 projet=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 corps=$(jq -nc --arg text "$branche"$'\n'"$projet" '{type: "git_push", text: $text}' 2>/dev/null) || exit 0
 
