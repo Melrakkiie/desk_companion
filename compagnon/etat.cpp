@@ -9,6 +9,12 @@ static bool rappelActif = false;
 static EtatCourant morceau;
 static bool morceauConnu = false;
 static bool morceauEnPause = false;  // connu mais plus courant (music_stop)
+static unsigned long nouvellesMusiqueMs = 0;  // dernier music ou music_stop reçu
+
+// Sans nouvelles depuis OUBLI_MORCEAU_MS : le morceau n'est plus connu (le prochain music s'affiche).
+static void oublierSiPerime(unsigned long maintenantMs) {
+  if (morceauConnu && maintenantMs - nouvellesMusiqueMs >= OUBLI_MORCEAU_MS) morceauConnu = false;
+}
 
 // Anti-rebond du Bouton
 static bool boutonEnfonce = false;
@@ -157,6 +163,8 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       return true;
     case EV_MUSIC: {
       // Même morceau que le connu (reprise après pause) : redevient courant, sans réaffichage.
+      oublierSiPerime(maintenantMs);
+      nouvellesMusiqueMs = maintenantMs;
       char l1[TEXTE_MAX + 1], l2[TEXTE_MAX + 1];
       const char* saut = texte == nullptr ? nullptr : strchr(texte, '\n');
       etatVersCp437(texte, l1, TEXTE_MAX + 1);
@@ -175,6 +183,8 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     }
     // Pause ou arrêt : le morceau reste connu mais n'est plus courant ; l'Expression ne change pas.
     case EV_MUSIC_STOP:
+      oublierSiPerime(maintenantMs);
+      nouvellesMusiqueMs = maintenantMs;
       morceauEnPause = true;
       return false;
     // Expression persistante : reste jusqu'au prochain Événement.
@@ -202,6 +212,7 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
 }
 
 bool etatMiseAJour(unsigned long maintenantMs) {
+  oublierSiPerime(maintenantMs);
   bool visible = false;
   if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
     rappelActif = false;
@@ -222,6 +233,7 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
   boutonChangementMs = maintenantMs;
   if (!enfonce) return false;
 
+  oublierSiPerime(maintenantMs);
   if (morceauConnu && !morceauEnPause) {
     rappel = morceau;
   } else {

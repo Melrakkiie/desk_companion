@@ -394,6 +394,48 @@ static void test_music_stop_sans_morceau_et_pendant_rappel() {
   assert(etatMiseAJour(1000 + DUREE_MUSIC_MS));
 }
 
+// ---- Oubli du Morceau courant (ticket #23) ----
+
+static void test_oubli_apres_30s_sans_nouvelles() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  etatMiseAJour(DUREE_MUSIC_MS);  // retour au Repos
+  assert(!etatBouton(false, OUBLI_MORCEAU_MS - 1));
+  assert(etatBouton(true, OUBLI_MORCEAU_MS - 1));  // 1 ms avant l'oubli : encore le morceau
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+  etatBouton(false, OUBLI_MORCEAU_MS + 100);
+  etatMiseAJour(OUBLI_MORCEAU_MS + 100000);  // fin du Rappel
+  assert(etatBouton(true, OUBLI_MORCEAU_MS + 200000));  // plus de nouvelles depuis longtemps
+  assert(etatCourant().expression == EXPR_SILENCE);
+}
+
+static void test_renvois_music_gardent_le_morceau_sans_reaffichage() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  for (unsigned long t = 10000; t <= 100000; t += 10000)
+    assert(!etatRecevoir(EV_MUSIC, "Titre", t, "Artiste"));  // renvoi invisible
+  assert(etatBouton(true, 105000));
+  assert(etatCourant().expression == EXPR_MUSIQUE);  // toujours courant
+}
+
+static void test_renvois_music_stop_ne_ressuscitent_pas_et_music_apres_oubli_s_affiche() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  etatMiseAJour(DUREE_MUSIC_MS);
+  etatMiseAJour(OUBLI_MORCEAU_MS + 1);  // oubli
+  assert(etatRecevoir(EV_MUSIC, "Titre", OUBLI_MORCEAU_MS + 2, "Artiste"));  // nouveau morceau
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+}
+
+static void test_music_stop_compte_comme_des_nouvelles() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  etatRecevoir(EV_MUSIC_STOP, nullptr, OUBLI_MORCEAU_MS - 1);
+  etatMiseAJour(OUBLI_MORCEAU_MS + 10000);  // 10 s après le music_stop : pas encore oublié
+  // reprise du même morceau : pas de réaffichage
+  assert(!etatRecevoir(EV_MUSIC, "Titre", OUBLI_MORCEAU_MS + 10000, "Artiste"));
+}
+
 // ---- Bouton et Rappel (ticket #21) ----
 
 static void test_rappel_musique_puis_retour() {
@@ -517,6 +559,10 @@ int main() {
   test_music_identique_apres_pause_redevient_courant();
   test_music_different_apres_pause_s_affiche();
   test_music_stop_sans_morceau_et_pendant_rappel();
+  test_oubli_apres_30s_sans_nouvelles();
+  test_renvois_music_gardent_le_morceau_sans_reaffichage();
+  test_renvois_music_stop_ne_ressuscitent_pas_et_music_apres_oubli_s_affiche();
+  test_music_stop_compte_comme_des_nouvelles();
   test_rappel_musique_puis_retour();
   test_rappel_silence_sans_music();
   test_bouton_rebonds_et_maintien_un_seul_rappel();
