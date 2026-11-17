@@ -32,12 +32,11 @@ struct Note {
   unsigned long dureeMs;
 };
 
-// Fanfare (git_push) : composition originale, ~3 s. Arpège montant, deux phrases, notes répétées, accord final tenu.
+// Fanfare (git_push) : intro de la fanfare de victoire trouvée en ligne, ~3 s.
+// Durées converties du sketch Arduino : 0,85 × 1000 / valeur (6 → 141, 2 → 425, 1 → 850 ms).
 const Note MELODIE_FANFARE[] = {
-  {523, 120}, {659, 120}, {784, 120}, {1047, 240}, {0, 60},
-  {784, 120}, {880, 120}, {988, 120}, {1175, 240}, {0, 60},
-  {1047, 150}, {0, 30}, {1047, 150}, {0, 30}, {1047, 150}, {0, 30},
-  {1319, 300}, {1568, 300}, {1047, 540},
+  {262, 141}, {262, 141}, {262, 141}, {262, 425},
+  {208, 425}, {233, 425}, {262, 141}, {0, 141}, {233, 141}, {262, 850},
 };
 // Carillon (claude_waiting) : ding-dong descendant, < 0,5 s.
 const Note MELODIE_CARILLON[] = {
