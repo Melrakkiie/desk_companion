@@ -384,7 +384,7 @@ static void test_son_fanfare_au_push_et_carillon_au_waiting() {
   assert(etatFrequence(0) == 0);
   etatRecevoir(EV_GIT_PUSH, "main\nprojet", 100);
   assert(etatSonCourant() == SON_FANFARE);
-  assert(etatFrequence(100) == 262);
+  assert(etatFrequence(100) == 523);
   etatRecevoir(EV_CLAUDE_WAITING, nullptr, 5000);
   assert(etatSonCourant() == SON_CARILLON);
   assert(etatFrequence(5000) == 988);
@@ -397,7 +397,7 @@ static void test_son_evenements_silencieux_ne_touchent_pas_au_son() {
   etatRecevoir(EV_MUSIC, "titre", 200, "artiste");
   etatRecevoir(EV_CLAUDE_WORKING, nullptr, 300);  // sans effet
   assert(etatSonCourant() == SON_FANFARE);
-  assert(etatFrequence(900) == 208);  // 900 ms après le début : la fanfare n'a pas été relancée (sinon 262)
+  assert(etatFrequence(900) == 415);  // 900 ms après le début : la fanfare n'a pas été relancée (sinon 523)
   etatRecevoir(EV_CLAUDE_WAITING, nullptr, 400);
   etatRecevoir(EV_CLAUDE_WORKING, nullptr, 500);  // avec effet : efface l'Expression
   assert(etatSonCourant() == SON_CARILLON);
@@ -407,29 +407,29 @@ static void test_son_evenements_silencieux_ne_touchent_pas_au_son() {
 static void test_son_nouveau_son_remplace_et_repart_du_debut() {
   etatInit();
   etatRecevoir(EV_GIT_PUSH, nullptr, 1000);
-  assert(etatFrequence(1900) == 208);  // 900 ms : 5e note
+  assert(etatFrequence(1900) == 415);  // 900 ms : 5e note
   etatRecevoir(EV_CLAUDE_WAITING, nullptr, 1900);
   assert(etatFrequence(1900) == 988);
   etatRecevoir(EV_GIT_PUSH, nullptr, 2000);
-  assert(etatFrequence(2000) == 262);
+  assert(etatFrequence(2000) == 523);
 }
 
 static void test_son_frequence_fanfare_aux_bornes() {
   etatInit();
   etatRecevoir(EV_GIT_PUSH, nullptr, 10000);
-  assert(etatFrequence(10000) == 262);
-  assert(etatFrequence(10000 + 110) == 262);
+  assert(etatFrequence(10000) == 523);
+  assert(etatFrequence(10000 + 110) == 523);
   assert(etatFrequence(10000 + 111) == 0);     // silence entre deux notes identiques
-  assert(etatFrequence(10000 + 141) == 262);   // 2e note, détachée
+  assert(etatFrequence(10000 + 141) == 523);   // 2e note, détachée
   assert(etatFrequence(10000 + 393) == 0);     // silence avant la 4e note
-  assert(etatFrequence(10000 + 423) == 262);
-  assert(etatFrequence(10000 + 847) == 262);   // fin de la 4e note tenue
-  assert(etatFrequence(10000 + 848) == 208);   // frontière
-  assert(etatFrequence(10000 + 1273) == 233);
+  assert(etatFrequence(10000 + 423) == 523);
+  assert(etatFrequence(10000 + 847) == 523);   // fin de la 4e note tenue
+  assert(etatFrequence(10000 + 848) == 415);   // frontière
+  assert(etatFrequence(10000 + 1273) == 466);
   assert(etatFrequence(10000 + 1839) == 0);    // silence
   assert(etatFrequence(10000 + 1979) == 0);
-  assert(etatFrequence(10000 + 1980) == 233);
-  assert(etatFrequence(10000 + 2970) == 262);  // note finale tenue
+  assert(etatFrequence(10000 + 1980) == 466);
+  assert(etatFrequence(10000 + 2970) == 523);  // note finale tenue
   assert(etatFrequence(10000 + 2971) == 0);    // terminé
   assert(etatFrequence(10000 + 99999) == 0);
 }
