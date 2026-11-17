@@ -83,13 +83,16 @@ systemctl --user enable --now compagnon-musique.service
 
 Arrêt et retrait : `systemctl --user disable --now compagnon-musique.service`.
 
-## Jeu (Steam)
+## Jeu (Steam et Lutris)
 
 `compagnon-jeu.sh` lit les processus (`/proc/*/cmdline`) et envoie `game` (nom du jeu) tant qu'un jeu lancé
 par Steam, natif ou Proton, tourne, `game_stop` sinon (client Steam seul compris). Le jeu est le processus
 `reaper SteamLaunch AppId=<id>` ; son nom vient du champ `name` de `appmanifest_<id>.acf` dans les
 bibliothèques de `libraryfolders.vdf` (`Steam <id>` si le manifest est introuvable, par exemple disque
 démonté). Les outils Steam (Proton, Steam Linux Runtime, Redistributables) ne comptent pas comme jeux.
+Les jeux Lutris (tous runners) sont reconnus aussi : le processus a pour argument `lutris-wrapper`, suivi du
+nom du jeu ; le client Lutris seul ne compte pas. Si un jeu Steam et un jeu Lutris tournent ensemble,
+seul le jeu Steam est envoyé.
 Envoi à chaque changement (lecture des processus toutes les 2 s : `COMPAGNON_JEU_SCAN_S`), puis renvoi de
 l'état toutes les 10 s (`COMPAGNON_JEU_RENVOI_S`, à garder sous les 30 s au bout desquelles le Compagnon
 oublie le jeu). Si le Compagnon est injoignable, le script continue.
