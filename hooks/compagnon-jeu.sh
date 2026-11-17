@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Jeu Steam -> Compagnon. Lit les processus (/proc/*/cmdline) et envoie en POST /event `game` (nom du jeu)
-# tant qu'un jeu lancé par Steam (natif ou Proton) tourne, `game_stop` sinon (y compris client Steam seul).
+# Jeu -> Compagnon. Lit les processus (/proc/*/cmdline) et envoie en POST /event `game` (nom du jeu)
+# tant qu'un jeu lancé par Steam (natif ou Proton) ou Lutris tourne, `game_stop` sinon (client seul compris).
 # Envoi à chaque changement, puis renvoi de l'état courant toutes les 10 s : le Compagnon rattrape ainsi
 # l'état réel après un redémarrage, un envoi perdu ou une cible injoignable.
 # Tourne en arrière-plan, sans jamais s'arrêter ni bloquer, même si le Compagnon est injoignable.
 #
-# Jeu Steam : processus `reaper SteamLaunch AppId=<id>` (vérifié, natif et Proton) ; nom lu dans le champ
+# jeu Steam : processus `reaper SteamLaunch AppId=<id>` (vérifié, natif et Proton) ; nom lu dans le champ
 # `name` de appmanifest_<id>.acf des bibliothèques de libraryfolders.vdf, sinon `Steam <id>`.
-# Jeu Lutris : argument `lutris-wrapper`, suivi du nom du jeu. Steam prime si les deux tournent.
+# jeu Lutris : argument `lutris-wrapper`, suivi du nom du jeu. Steam prime si les deux tournent.
 #
 # Cible : http://compagnon.local, remplaçable par la variable COMPAGNON_URL (tests).
 # Période de renvoi (10 s par défaut) : COMPAGNON_JEU_RENVOI_S (secondes, décimales permises) ;
@@ -28,7 +28,10 @@ source_defaut=$'gawk \'BEGIN{RS="\\0"} {printf "%s%s", (FNR>1 ? "\\037" : ""), $
 source_cmd=${COMPAGNON_JEU_SOURCE:-$source_defaut}
 
 # Outils Steam qui ne sont pas des jeux : Linux Runtime scout/sniper, Proton Experimental, Redistributables.
-outils=" 1070560 1493710 1628350 228980 "
+outils_steam=" 1070560 1493710 1628350 228980 "
+
+# Source par défaut sans gawk : aucun jeu ne serait jamais détecté ; on le dit dans le journal (stderr), on continue.
+[ -z "$COMPAGNON_JEU_SOURCE" ] && ! command -v gawk >/dev/null && echo "compagnon-jeu : gawk introuvable, aucun jeu ne sera détecté (installer gawk)" >&2
 
 renvoi_us=$(awk -v s="$renvoi_s" 'BEGIN{printf "%d", s*1000000}')
 corps=""
@@ -40,7 +43,7 @@ nom_steam() {
   while IFS= read -r biblio; do
     [ -f "$biblio/steamapps/appmanifest_$1.acf" ] || continue
     nom=$(sed -n 's/^[[:space:]]*"name"[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$biblio/steamapps/appmanifest_$1.acf" | head -n 1)
-    [ -n "$nom" ] && { printf '%s\n' "${nom//\\\"/\"}"; return; }
+    [ -n "$nom" ] && { sed 's/\\\(["\\]\)/\1/g' <<< "$nom"; return; }
   done < <(printf '%s\n' "$steam_dir"; sed -n 's/^[[:space:]]*"path"[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$steam_dir/steamapps/libraryfolders.vdf" 2>/dev/null)
   echo "Steam $1"
 }
@@ -49,11 +52,11 @@ nom_steam() {
 # s'il en est un. Pour un autre lanceur, ajouter une fonction et la lister dans `matchers`.
 jeu_steam() {
   [ "${1##*/}" = reaper ] && [ "$2" = SteamLaunch ] && [[ $3 =~ ^AppId=([0-9]+)$ ]] || return 1
-  [[ $outils == *" ${BASH_REMATCH[1]} "* ]] && return 1
+  [[ $outils_steam == *" ${BASH_REMATCH[1]} "* ]] && return 1
   nom_steam "${BASH_REMATCH[1]}"
 }
 
-# Jeu Lutris (vérifié, tous runners) : argv[0] est python3 ; l'argument de basename `lutris-wrapper` est
+# jeu Lutris (vérifié, tous runners) : argv[0] est python3 ; l'argument de basename `lutris-wrapper` est
 # suivi du nom du jeu (un seul argument). Le client Lutris seul n'a pas ce wrapper.
 jeu_lutris() {
   local i

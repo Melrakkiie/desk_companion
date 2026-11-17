@@ -1,5 +1,5 @@
 [Unit]
-Description=Compagnon : envoi du jeu Steam en cours
+Description=Compagnon : envoi du jeu en cours (Steam, Lutris)
 
 [Service]
 # Chemin à adapter si le dépôt n'est pas dans ~/Projects/esp32/desk_companion

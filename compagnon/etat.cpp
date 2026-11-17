@@ -118,7 +118,7 @@ static void repos() {
   installer(EXPR_REPOS, nullptr, false, 0, 0);
 }
 
-// Jeu : persistante, nom du jeu seul dans le Bandeau (jeuNom est déjà en CP437).
+// Jeu : ni temporaire ni persistante, c'est le point de retour ; nom du jeu seul dans le Bandeau (jeuNom est déjà en CP437).
 static void jeu(unsigned long maintenantMs) {
   installer(EXPR_JEU, nullptr, false, maintenantMs, 0);
   strcpy(etat.texte, jeuNom);
@@ -128,6 +128,14 @@ static void jeu(unsigned long maintenantMs) {
 static void retour(unsigned long maintenantMs) {
   if (jeuConnu) jeu(maintenantMs);
   else repos();
+}
+
+// Oublie le Jeu courant (game_stop ou oubli après OUBLI_JEU_MS) ; vrai si l'Expression Jeu cède la place au Repos.
+static bool oublierJeu() {
+  jeuConnu = false;
+  if (etat.expression != EXPR_JEU) return false;
+  repos();
+  return true;
 }
 
 void etatInit(bool boutonEnfonceAuDemarrage) {
@@ -144,7 +152,7 @@ void etatInit(bool boutonEnfonceAuDemarrage) {
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
   static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop"};
   if (nom == nullptr) return false;
-  for (int i = 0; i < 8; i++) {
+  for (unsigned i = 0; i < sizeof(NOMS) / sizeof(*NOMS); i++) {
     if (strcmp(nom, NOMS[i]) == 0) {
       *type = (TypeEvenement)i;  // l'ordre de NOMS suit celui de l'enum TypeEvenement
       return true;
@@ -236,10 +244,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       return false;
     }
     case EV_GAME_STOP:
-      jeuConnu = false;
-      if (etat.expression != EXPR_JEU) return false;
-      repos();
-      return true;
+      return oublierJeu();
   }
   return false;  // inatteignable : tous les types sont traités ci-dessus
 }
@@ -257,11 +262,7 @@ bool etatMiseAJour(unsigned long maintenantMs) {
   oublierSiPerime(maintenantMs);
   bool visible = false;
   if (jeuConnu && maintenantMs - nouvellesJeuMs >= OUBLI_JEU_MS) {  // même effet qu'un game_stop
-    jeuConnu = false;
-    if (etat.expression == EXPR_JEU) {
-      repos();
-      visible = !rappelActif;
-    }
+    if (oublierJeu()) visible = !rappelActif;
   }
   if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
     rappelActif = false;
