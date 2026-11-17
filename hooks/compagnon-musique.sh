@@ -20,10 +20,14 @@ renvoi_s=${COMPAGNON_MUSIQUE_RENVOI_S:-10}  # période de renvoi ; garder < 30 s
 sep=$'\x1f'
 source_cmd=${COMPAGNON_MUSIQUE_SOURCE:-"playerctl --follow metadata --format '{{status}}${sep}{{artist}}${sep}{{title}}'"}
 
-corps='{"type":"music_stop"}'  # état courant à annoncer (survit aux relances de la source)
+corps_stop='{"type":"music_stop"}'
+corps=$corps_stop  # état courant à annoncer (survit aux relances de la source)
+renvoi_us=$(awk -v s="$renvoi_s" 'BEGIN{printf "%d", s*1000000}')
+dernier_envoi_us=0
 
 # Synchrone, borné par --max-time ; un échec est sans conséquence : le renvoi suivant rattrape.
 envoyer() {
+  dernier_envoi_us=${EPOCHREALTIME/[.,]/}  # microsecondes, quel que soit le séparateur décimal local
   curl -sf -o /dev/null --max-time "$delai_curl_s" -X POST -H 'Content-Type: application/json' \
     -d "$corps" "${COMPAGNON_URL:-http://compagnon.local}/event" >/dev/null 2>&1
   return 0
@@ -38,15 +42,19 @@ while true; do
     if [ $rc -eq 0 ]; then
       # Lecture : music (reprise d'un morceau après pause : renvoyé) ; sinon music_stop.
       if [ "$statut" = Playing ] && [ -n "$titre" ]; then
-        c=$(jq -nc --arg text "$titre" --arg artist "$artiste" \
+        corps_music=$(jq -nc --arg text "$titre" --arg artist "$artiste" \
           '{type: "music", text: $text, artist: $artist}' 2>/dev/null) || continue
-        corps=$c
+        corps=$corps_music
       else
-        corps='{"type":"music_stop"}'
+        corps=$corps_stop
       fi
     elif [ $rc -le 128 ]; then
-      corps='{"type":"music_stop"}'  # fin de la source : plus de lecteur
-      envoyer
+      # Fin de la source : plus de lecteur. music_stop tout de suite si l'état change, sinon
+      # seulement à la cadence de renvoi (la source est relancée plus souvent, toutes les relance_s).
+      if [ "$corps" != "$corps_stop" ] || [ $((${EPOCHREALTIME/[.,]/} - dernier_envoi_us)) -ge "$renvoi_us" ]; then
+        corps=$corps_stop
+        envoyer
+      fi
       break
     fi
     # Nouvel état ou délai dépassé (rc > 128) : (ré)envoi de l'état courant.

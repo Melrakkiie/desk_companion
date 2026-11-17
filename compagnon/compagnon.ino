@@ -29,8 +29,8 @@ void setup() {
   if (!expressionsInit()) {
     Serial.println("Écran : introuvable (voir câblage, adresse 0x3C)");
   }
-  etatInit();
   pinMode(BROCHE_BOUTON, INPUT_PULLUP);
+  etatInit(digitalRead(BROCHE_BOUTON) == LOW);
   buzzerInit();
   reseauInit();
   apiInit();

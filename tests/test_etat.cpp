@@ -479,6 +479,15 @@ static void test_bouton_rebonds_et_maintien_un_seul_rappel() {
   assert(etatBouton(true, 2100));    // nouvel appui
 }
 
+static void test_bouton_tenu_au_demarrage_sans_rappel() {
+  etatInit(true);
+  assert(!etatBouton(true, 100));    // toujours tenu : pas de Rappel
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(!etatBouton(false, 500));   // relâché
+  assert(etatBouton(true, 1000));    // vrai front d'appui : Rappel
+  assert(etatCourant().expression == EXPR_SILENCE);
+}
+
 static void test_bouton_nouvel_appui_relance_le_rappel() {
   etatInit();
   etatBouton(true, 1000);
@@ -566,6 +575,7 @@ int main() {
   test_rappel_musique_puis_retour();
   test_rappel_silence_sans_music();
   test_bouton_rebonds_et_maintien_un_seul_rappel();
+  test_bouton_tenu_au_demarrage_sans_rappel();
   test_bouton_nouvel_appui_relance_le_rappel();
   test_rappel_pendant_waiting_retour_a_l_interpellation();
   test_rappel_pendant_expression_qui_expire_retour_au_repos();
