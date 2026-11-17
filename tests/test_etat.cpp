@@ -347,6 +347,53 @@ static void test_son_durees_totales() {
   assert(etatDureeSon(SON_CARILLON) > 0 && etatDureeSon(SON_CARILLON) < 500);
 }
 
+// ---- music_stop (ticket #22) ----
+
+static void test_music_stop_nom_et_pause_sans_changement() {
+  etatInit();
+  TypeEvenement t;
+  assert(etatTypeDepuisNom("music_stop", &t) && t == EV_MUSIC_STOP);
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  assert(!etatRecevoir(EV_MUSIC_STOP, nullptr, 100));  // aucun changement d'Expression
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+  assert(etatMiseAJour(DUREE_MUSIC_MS));  // l'Expression music expire normalement
+  assert(etatCourant().expression == EXPR_REPOS);
+  // en pause : plus de Morceau courant, le Bouton répond silence
+  assert(etatBouton(true, 20000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+}
+
+static void test_music_identique_apres_pause_redevient_courant() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  etatRecevoir(EV_MUSIC_STOP, nullptr, 100);
+  etatMiseAJour(DUREE_MUSIC_MS);  // retour au Repos
+  assert(!etatRecevoir(EV_MUSIC, "Titre", 20000, "Artiste"));  // reprise : pas de changement
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatBouton(true, 21000));
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+  assert(strcmp(etatCourant().texte, "Titre") == 0);
+}
+
+static void test_music_different_apres_pause_s_affiche() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  etatRecevoir(EV_MUSIC_STOP, nullptr, 100);
+  assert(etatRecevoir(EV_MUSIC, "Titre", 200, "Autre"));
+  assert(etatRecevoir(EV_MUSIC, "Autre titre", 300, "Artiste"));
+}
+
+static void test_music_stop_sans_morceau_et_pendant_rappel() {
+  etatInit();
+  assert(!etatRecevoir(EV_MUSIC_STOP, nullptr, 0));  // rien de connu : sans effet
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  etatBouton(true, 1000);
+  assert(!etatRecevoir(EV_MUSIC_STOP, nullptr, 1500));  // ne met pas fin au Rappel
+  assert(etatCourant().debutMs == 1000);
+  assert(!etatMiseAJour(1000 + 9999));
+  assert(etatMiseAJour(1000 + DUREE_MUSIC_MS));
+}
+
 // ---- Bouton et Rappel (ticket #21) ----
 
 static void test_rappel_musique_puis_retour() {
@@ -466,6 +513,10 @@ int main() {
   test_repos_clignement_ferme_puis_rouvre();
   test_push_temporaire_3s_puis_repos();
   test_push_fleche_reste_dans_zone_visage();
+  test_music_stop_nom_et_pause_sans_changement();
+  test_music_identique_apres_pause_redevient_courant();
+  test_music_different_apres_pause_s_affiche();
+  test_music_stop_sans_morceau_et_pendant_rappel();
   test_rappel_musique_puis_retour();
   test_rappel_silence_sans_music();
   test_bouton_rebonds_et_maintien_un_seul_rappel();
