@@ -13,6 +13,8 @@ const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (aucun Morceau c
 // Le PC renvoie l'état de lecture (music ou music_stop) toutes les 10 s (hook, hors module) ;
 // sans aucune nouvelle pendant 30 s, le Compagnon oublie le Morceau courant (3 renvois manqués).
 const unsigned long OUBLI_MORCEAU_MS = 30000;
+// Même principe pour le Jeu courant : le PC renvoie game ou game_stop toutes les 10 s (hors module).
+const unsigned long OUBLI_JEU_MS = 30000;
 const unsigned long ANTI_REBOND_MS = 50;  // Bouton : changements de niveau ignorés après un changement accepté
 const unsigned long PERIODE_ANIM_MS = 33;    // redessin périodique (~30 images/s)
 // Clignement du Repos : un par cycle, à un instant irrégulier du cycle.
@@ -61,7 +63,9 @@ enum TypeEvenement {
   EV_CLAUDE_WORKING,
   EV_MUSIC,
   EV_GIT_PUSH,
-  EV_MUSIC_STOP
+  EV_MUSIC_STOP,
+  EV_GAME,       // texte = nom du jeu
+  EV_GAME_STOP
 };
 
 enum Expression {
@@ -70,6 +74,7 @@ enum Expression {
   EXPR_INTERPELLE,  // claude_waiting (ticket #7)
   EXPR_MUSIQUE,     // music (ticket #8)
   EXPR_PUSH,        // git_push (ticket #9)
+  EXPR_JEU,         // Jeu courant : point de retour à la place du Repos
   EXPR_SILENCE      // Rappel sans Morceau courant : jamais issue d'un Événement
 };
 
