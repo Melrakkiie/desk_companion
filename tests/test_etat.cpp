@@ -276,7 +276,84 @@ static void test_cp437_largeur_en_glyphes_et_troncature() {
   assert((int)strlen(etatCourant().texte) == TEXTE_MAX);
 }
 
+// ---- Sons (ticket #15) ----
+static void test_son_fanfare_au_push_et_carillon_au_waiting() {
+  etatInit();
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(etatFrequence(0) == 0);
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 100);
+  assert(etatSonCourant() == SON_FANFARE);
+  assert(etatFrequence(100) == 523);
+  etatRecevoir(EV_CLAUDE_WAITING, nullptr, 5000);
+  assert(etatSonCourant() == SON_CARILLON);
+  assert(etatFrequence(5000) == 988);
+}
+
+static void test_son_evenements_silencieux_ne_touchent_pas_au_son() {
+  etatInit();
+  etatRecevoir(EV_GIT_PUSH, nullptr, 0);
+  etatRecevoir(EV_CLAUDE_DONE, "p", 100);
+  etatRecevoir(EV_MUSIC, "titre", 200, "artiste");
+  etatRecevoir(EV_CLAUDE_WORKING, nullptr, 300);  // sans effet
+  assert(etatSonCourant() == SON_FANFARE);
+  assert(etatFrequence(300) == 784);  // 300 ms après le début : la fanfare n'a pas été relancée
+  etatRecevoir(EV_CLAUDE_WAITING, nullptr, 400);
+  etatRecevoir(EV_CLAUDE_WORKING, nullptr, 500);  // avec effet : efface l'Expression
+  assert(etatSonCourant() == SON_CARILLON);
+  assert(etatFrequence(500) == 988);  // 100 ms après le début du carillon
+}
+
+static void test_son_nouveau_son_remplace_et_repart_du_debut() {
+  etatInit();
+  etatRecevoir(EV_GIT_PUSH, nullptr, 1000);
+  assert(etatFrequence(1700) == 784);  // 700 ms : début de la 2e phrase
+  etatRecevoir(EV_CLAUDE_WAITING, nullptr, 1700);
+  assert(etatFrequence(1700) == 988);
+  etatRecevoir(EV_GIT_PUSH, nullptr, 1800);
+  assert(etatFrequence(1800) == 523);
+}
+
+static void test_son_frequence_fanfare_aux_bornes() {
+  etatInit();
+  etatRecevoir(EV_GIT_PUSH, nullptr, 10000);
+  assert(etatFrequence(10000) == 523);
+  assert(etatFrequence(10000 + 119) == 523);
+  assert(etatFrequence(10000 + 120) == 659);   // frontière
+  assert(etatFrequence(10000 + 400) == 1047);  // milieu de la 4e note
+  assert(etatFrequence(10000 + 599) == 1047);
+  assert(etatFrequence(10000 + 600) == 0);     // silence entre les phrases
+  assert(etatFrequence(10000 + 659) == 0);
+  assert(etatFrequence(10000 + 660) == 784);
+  assert(etatFrequence(10000 + 2999) == 1047);  // accord final tenu
+  assert(etatFrequence(10000 + 3000) == 0);     // terminé
+  assert(etatFrequence(10000 + 99999) == 0);
+}
+
+static void test_son_frequence_carillon_aux_bornes() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, nullptr, 0);
+  assert(etatFrequence(0) == 988);
+  assert(etatFrequence(149) == 988);
+  assert(etatFrequence(150) == 0);  // silence entre les deux notes
+  assert(etatFrequence(179) == 0);
+  assert(etatFrequence(180) == 784);
+  assert(etatFrequence(429) == 784);
+  assert(etatFrequence(430) == 0);  // terminé
+}
+
+static void test_son_durees_totales() {
+  assert(etatDureeSon(SON_AUCUN) == 0);
+  assert(etatDureeSon(SON_FANFARE) >= 2900 && etatDureeSon(SON_FANFARE) <= 3100);
+  assert(etatDureeSon(SON_CARILLON) > 0 && etatDureeSon(SON_CARILLON) < 500);
+}
+
 int main() {
+  test_son_fanfare_au_push_et_carillon_au_waiting();
+  test_son_evenements_silencieux_ne_touchent_pas_au_son();
+  test_son_nouveau_son_remplace_et_repart_du_debut();
+  test_son_frequence_fanfare_aux_bornes();
+  test_son_frequence_carillon_aux_bornes();
+  test_son_durees_totales();
   test_cp437_accents_francais();
   test_cp437_largeur_en_glyphes_et_troncature();
   test_repos_au_demarrage();
