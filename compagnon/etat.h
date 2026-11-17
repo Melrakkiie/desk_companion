@@ -57,7 +57,8 @@ enum TypeEvenement {
   EV_CLAUDE_WAITING,
   EV_CLAUDE_WORKING,
   EV_MUSIC,
-  EV_GIT_PUSH
+  EV_GIT_PUSH,
+  EV_MUSIC_STOP
 };
 
 enum Expression {

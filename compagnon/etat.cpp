@@ -8,6 +8,7 @@ static EtatCourant rappel;
 static bool rappelActif = false;
 static EtatCourant morceau;
 static bool morceauConnu = false;
+static bool morceauEnPause = false;  // connu mais plus courant (music_stop)
 
 // Anti-rebond du Bouton
 static bool boutonEnfonce = false;
@@ -105,14 +106,15 @@ void etatInit() {
   sonCourant = SON_AUCUN;
   rappelActif = false;
   morceauConnu = false;
+  morceauEnPause = false;
   boutonEnfonce = false;
   boutonChangement = false;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
-  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push"};
+  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop"};
   if (nom == nullptr) return false;
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 6; i++) {
     if (strcmp(nom, NOMS[i]) == 0) {
       *type = (TypeEvenement)i;  // l'ordre de NOMS suit celui de l'enum TypeEvenement
       return true;
@@ -153,13 +155,28 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
       demarrerSon(SON_FANFARE, maintenantMs);
       return true;
-    case EV_MUSIC:
+    case EV_MUSIC: {
+      // Même morceau que le connu (reprise après pause) : redevient courant, sans réaffichage.
+      char l1[TEXTE_MAX + 1], l2[TEXTE_MAX + 1];
+      const char* saut = texte == nullptr ? nullptr : strchr(texte, '\n');
+      etatVersCp437(texte, l1, TEXTE_MAX + 1);
+      etatVersCp437(saut != nullptr ? saut + 1 : artiste, l2, TEXTE_MAX + 1);
+      if (morceauConnu && strcmp(l1, morceau.texte) == 0 && strcmp(l2, morceau.ligne2) == 0) {
+        morceauEnPause = false;
+        return false;
+      }
       installer(EXPR_MUSIQUE, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
       // la durée dépend des textes tronqués réellement conservés
       etat.dureeMs = etatDureeMusique(etat.texte, etat.ligne2);
       morceau = etat;
       morceauConnu = true;
+      morceauEnPause = false;
       return true;
+    }
+    // Pause ou arrêt : le morceau reste connu mais n'est plus courant ; l'Expression ne change pas.
+    case EV_MUSIC_STOP:
+      morceauEnPause = true;
+      return false;
     // Expression persistante : reste jusqu'au prochain Événement.
     // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne
     // (un claude_working d'une session peut effacer le claude_waiting d'une autre).
@@ -205,7 +222,7 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
   boutonChangementMs = maintenantMs;
   if (!enfonce) return false;
 
-  if (morceauConnu) {
+  if (morceauConnu && !morceauEnPause) {
     rappel = morceau;
   } else {
     rappel.expression = EXPR_SILENCE;
