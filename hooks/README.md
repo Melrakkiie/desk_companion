@@ -62,9 +62,12 @@ Limite : Linux uniquement (le script lit `/proc`), et seulement les clients qui 
 
 ## Musique (lecteur multimédia)
 
-`compagnon-musique.sh` suit `playerctl --follow metadata` et envoie un Événement `music` (titre, artiste)
-par morceau : pas de renvoi pour le même morceau, ni après une pause. Si le Compagnon est injoignable, le
-script continue et renvoie le morceau en cours toutes les 5 s jusqu'à ce que la cible réponde ; si `playerctl` s'arrête (aucun lecteur), il le relance toutes les 5 s.
+`compagnon-musique.sh` suit `playerctl --follow metadata` et envoie l'état de lecture à chaque changement :
+`music` (titre, artiste) si un morceau joue, `music_stop` sinon (pause, arrêt, lecteur fermé). Il renvoie
+aussi cet état toutes les 10 s (période réglable : `COMPAGNON_MUSIQUE_RENVOI_S`, en secondes ; la garder
+sous les 30 s au bout desquelles le Compagnon oublie le morceau) : c'est le Compagnon qui reconnaît un morceau
+déjà connu, donc ces renvois ne changent rien à l'écran. Si le Compagnon est injoignable, le script continue et
+l'état réel est rattrapé au renvoi suivant ; si `playerctl` s'arrête (aucun lecteur), il le relance toutes les 5 s.
 Dépendances : `playerctl` (`sudo dnf install playerctl`), `jq`, `curl`. Cible : `COMPAGNON_URL`.
 
 Lancement à l'ouverture de session (service utilisateur systemd ; adapter le chemin dans
