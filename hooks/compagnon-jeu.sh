@@ -48,12 +48,13 @@ nom_steam() {
   echo "Steam $1"
 }
 
-# Un matcher par type de jeu : reçoit les arguments d'un processus, affiche le nom du jeu et réussit
-# s'il en est un. Pour un autre lanceur, ajouter une fonction et la lister dans `matchers`.
+# Un matcher par type de jeu : reçoit les arguments d'un processus, met le nom du jeu dans `jeu` et
+# réussit s'il en est un. Pour un autre lanceur, ajouter une fonction et la lister dans `matchers`.
+# Appelés sans $(…) : un sous-shell par processus (des centaines toutes les 2 s) coûtait ~1/3 de cœur.
 jeu_steam() {
   [ "${1##*/}" = reaper ] && [ "$2" = SteamLaunch ] && [[ $3 =~ ^AppId=([0-9]+)$ ]] || return 1
   [[ $outils_steam == *" ${BASH_REMATCH[1]} "* ]] && return 1
-  nom_steam "${BASH_REMATCH[1]}"
+  jeu=$(nom_steam "${BASH_REMATCH[1]}")
 }
 
 # jeu Lutris (vérifié, tous runners) : argv[0] est python3 ; l'argument de basename `lutris-wrapper` est
@@ -61,20 +62,23 @@ jeu_steam() {
 jeu_lutris() {
   local i
   for ((i = 1; i < $#; i++)); do
-    [ "${!i##*/}" = lutris-wrapper ] && { printf '%s\n' "${@:i+1:1}"; return 0; }
+    [ "${!i##*/}" = lutris-wrapper ] && { jeu=${@:i+1:1}; return 0; }
   done
   return 1
 }
 matchers=(jeu_steam jeu_lutris)  # par ordre de priorité : Steam l'emporte sur Lutris
+# Tri rapide avant le découpage des arguments : une ligne sans ces mots ne peut être retenue par aucun matcher.
+indices='reaper|lutris-wrapper'
 
 # Nom du premier jeu trouvé (matchers dans l'ordre, puis processus) ; échoue s'il n'y en a pas.
 trouver_jeu() {
-  local ligne args m nom lignes=()
+  local ligne args m jeu lignes=()
   mapfile -t lignes < <(bash -c "$source_cmd" 2>/dev/null)
   for m in "${matchers[@]}"; do
     for ligne in "${lignes[@]}"; do
+      [[ $ligne =~ $indices ]] || continue
       IFS=$sep read -r -a args <<< "$ligne"
-      nom=$("$m" "${args[@]}") && { printf '%s\n' "$nom"; return 0; }
+      "$m" "${args[@]}" && { printf '%s\n' "$jeu"; return 0; }
     done
   done
   return 1
