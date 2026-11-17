@@ -10,6 +10,9 @@ const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
 const unsigned long DUREE_GIT_PUSH_MS = 3000;
 const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
 const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (aucun Morceau courant)
+// Le PC renvoie l'état de lecture (music ou music_stop) toutes les 10 s (hook, hors module) ;
+// sans aucune nouvelle pendant 30 s, le Compagnon oublie le Morceau courant (3 renvois manqués).
+const unsigned long OUBLI_MORCEAU_MS = 30000;
 const unsigned long ANTI_REBOND_MS = 50;      // Bouton : changements de niveau ignorés après un changement accepté
 const unsigned long PERIODE_ANIM_MS = 33;   // redessin périodique (~30 images/s)
 // Clignement du Repos : un par cycle, à un instant irrégulier du cycle.
