@@ -1,6 +1,7 @@
 // Compagnon de bureau : programme principal.
-// Assemble les modules Réseau, API, État et Expressions. Aucun delay() : la boucle tourne librement.
+// Assemble les modules Réseau, API, État, Expressions et Buzzer. Aucun delay() : la boucle tourne librement.
 #include "api.h"
+#include "buzzer.h"
 #include "etat.h"
 #include "expressions.h"
 #include "reseau.h"
@@ -27,6 +28,7 @@ void setup() {
     Serial.println("Écran : introuvable (voir câblage, adresse 0x3C)");
   }
   etatInit();
+  buzzerInit();
   reseauInit();
   apiInit();
   dernierEtatWifi = !reseauConnecte();  // force un premier affichage
@@ -36,6 +38,7 @@ void loop() {
   reseauMiseAJour();
   bool aRedessiner = apiMiseAJour();
   aRedessiner |= etatMiseAJour(millis());
+  buzzerJouer(etatFrequence(millis()));  // Son courant, sans bloquer la boucle
 
   bool connecte = reseauConnecte();
   if (connecte != dernierEtatWifi) {

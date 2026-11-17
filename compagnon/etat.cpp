@@ -30,6 +30,47 @@ void etatVersCp437(const char* utf8, char* sortie, int taille) {
   sortie[n] = '\0';
 }
 
+static Son sonCourant = SON_AUCUN;
+static unsigned long sonDebutMs = 0;
+
+static void demarrerSon(Son son, unsigned long maintenantMs) {
+  sonCourant = son;
+  sonDebutMs = maintenantMs;
+}
+
+static const Note* melodie(Son son, int* n) {
+  if (son == SON_FANFARE) { *n = sizeof(MELODIE_FANFARE) / sizeof(Note); return MELODIE_FANFARE; }
+  if (son == SON_CARILLON) { *n = sizeof(MELODIE_CARILLON) / sizeof(Note); return MELODIE_CARILLON; }
+  *n = 0;
+  return nullptr;
+}
+
+unsigned long etatDureeSon(Son son) {
+  int n;
+  const Note* notes = melodie(son, &n);
+  unsigned long total = 0;
+  for (int i = 0; i < n; i++) total += notes[i].dureeMs;
+  return total;
+}
+
+unsigned int etatFrequenceSon(Son son, unsigned long tempsEcouleMs) {
+  int n;
+  const Note* notes = melodie(son, &n);
+  for (int i = 0; i < n; i++) {
+    if (tempsEcouleMs < notes[i].dureeMs) return notes[i].frequenceHz;
+    tempsEcouleMs -= notes[i].dureeMs;
+  }
+  return 0;
+}
+
+Son etatSonCourant() {
+  return sonCourant;
+}
+
+unsigned int etatFrequence(unsigned long maintenantMs) {
+  return etatFrequenceSon(sonCourant, maintenantMs - sonDebutMs);
+}
+
 static void installer(Expression expression, const char* texte, bool temporaire,
                       unsigned long maintenantMs, unsigned long dureeMs,
                       const char* artiste = nullptr) {
@@ -43,8 +84,14 @@ static void installer(Expression expression, const char* texte, bool temporaire,
   etat.dureeMs = dureeMs;
 }
 
-void etatInit() {
+// Retour au Repos : l'Expression change, le Son en cours n'est pas touché.
+static void repos() {
   installer(EXPR_REPOS, nullptr, false, 0, 0);
+}
+
+void etatInit() {
+  repos();
+  sonCourant = SON_AUCUN;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
@@ -89,6 +136,7 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
       return true;
     case EV_GIT_PUSH:
       installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
+      demarrerSon(SON_FANFARE, maintenantMs);
       return true;
     case EV_MUSIC:
       installer(EXPR_MUSIQUE, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
@@ -100,11 +148,12 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
     // (un claude_working d'une session peut effacer le claude_waiting d'une autre).
     case EV_CLAUDE_WAITING:
       installer(EXPR_INTERPELLE, texte, false, maintenantMs, 0);
+      demarrerSon(SON_CARILLON, maintenantMs);
       return true;
     // Ramène au Repos seulement si on attend ; sinon sans effet (l'API répond quand même 200).
     case EV_CLAUDE_WORKING:
       if (etat.expression != EXPR_INTERPELLE) return false;
-      etatInit();
+      repos();
       return true;
   }
   return false;  // inatteignable : tous les types sont traités ci-dessus
@@ -112,7 +161,7 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
 
 bool etatMiseAJour(unsigned long maintenantMs) {
   if (etat.temporaire && maintenantMs - etat.debutMs >= etat.dureeMs) {
-    etatInit();
+    repos();
     return true;
   }
   return false;
