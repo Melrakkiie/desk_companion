@@ -9,7 +9,9 @@
 const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
 const unsigned long DUREE_GIT_PUSH_MS = 3000;
 const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
-const unsigned long PERIODE_ANIM_MS = 33;    // redessin périodique (~30 images/s)
+const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (aucun Morceau courant)
+const unsigned long ANTI_REBOND_MS = 50;      // Bouton : changements de niveau ignorés après un changement accepté
+const unsigned long PERIODE_ANIM_MS = 33;   // redessin périodique (~30 images/s)
 // Clignement du Repos : un par cycle, à un instant irrégulier du cycle.
 const unsigned long PERIODE_CLIGNEMENT_MS = 4000;
 const unsigned long DUREE_CLIGNEMENT_MS = 150;
@@ -63,7 +65,8 @@ enum Expression {
   EXPR_CONTENT,     // claude_done
   EXPR_INTERPELLE,  // claude_waiting (ticket #7)
   EXPR_MUSIQUE,     // music (ticket #8)
-  EXPR_PUSH         // git_push (ticket #9)
+  EXPR_PUSH,        // git_push (ticket #9)
+  EXPR_SILENCE      // Rappel sans Morceau courant : jamais issue d'un Événement
 };
 
 struct EtatCourant {
@@ -109,6 +112,13 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
 // À appeler à chaque tour de loop() : renvoie vrai si l'Expression a changé (retour au Repos).
 bool etatMiseAJour(unsigned long maintenantMs);
 
+// Bouton : à appeler à chaque tour de loop() avec le niveau brut (vrai = enfoncé) et l'heure.
+// Anti-rebond et front d'appui sont ici. L'enfoncement montre un Rappel (musique du Morceau
+// courant, sinon silence) ; un bouton maintenu ou qui rebondit n'en montre qu'un seul.
+// Renvoie vrai si l'affichage change.
+bool etatBouton(bool enfonce, unsigned long maintenantMs);
+
+// Expression à afficher : le Rappel s'il y en a un, sinon l'Expression courante.
 const EtatCourant& etatCourant();
 
 // Clignement du Repos (ticket #6) : sans état, dépend seulement de l'heure.

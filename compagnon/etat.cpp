@@ -1,7 +1,18 @@
 #include "etat.h"
 #include <string.h>
 
-static EtatCourant etat;
+static EtatCourant etat;  // l'Expression courante, que le Rappel recouvre sans la toucher
+
+// Rappel (appui sur le Bouton) et Morceau courant : le dernier music reçu (copie de etat).
+static EtatCourant rappel;
+static bool rappelActif = false;
+static EtatCourant morceau;
+static bool morceauConnu = false;
+
+// Anti-rebond du Bouton
+static bool boutonEnfonce = false;
+static bool boutonChangement = false;  // un changement accepté a déjà eu lieu
+static unsigned long boutonChangementMs = 0;
 
 // Lettres non ASCII disponibles en CP437 : {point de code Unicode, octet CP437}.
 static const struct { unsigned int unicode; unsigned char cp437; } TABLE_CP437[] = {
@@ -92,6 +103,10 @@ static void repos() {
 void etatInit() {
   repos();
   sonCourant = SON_AUCUN;
+  rappelActif = false;
+  morceauConnu = false;
+  boutonEnfonce = false;
+  boutonChangement = false;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
@@ -128,8 +143,8 @@ unsigned long etatDureeMusique(const char* ligne1, const char* ligne2) {
   return deux > DUREE_MUSIC_MS ? deux : DUREE_MUSIC_MS;
 }
 
-bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
-                  const char* artiste) {
+static bool recevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
+                     const char* artiste) {
   switch (type) {
     case EV_CLAUDE_DONE:
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
@@ -142,6 +157,8 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
       installer(EXPR_MUSIQUE, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
       // la durée dépend des textes tronqués réellement conservés
       etat.dureeMs = etatDureeMusique(etat.texte, etat.ligne2);
+      morceau = etat;
+      morceauConnu = true;
       return true;
     // Expression persistante : reste jusqu'au prochain Événement.
     // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne
@@ -159,16 +176,51 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
   return false;  // inatteignable : tous les types sont traités ci-dessus
 }
 
+// Un Événement qui change l'Expression met fin au Rappel ; sans effet (false), il ne l'interrompt pas.
+bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
+                  const char* artiste) {
+  bool change = recevoir(type, texte, maintenantMs, artiste);
+  if (change) rappelActif = false;
+  return change;
+}
+
 bool etatMiseAJour(unsigned long maintenantMs) {
+  bool visible = false;
+  if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
+    rappelActif = false;
+    visible = true;
+  }
   if (etat.temporaire && maintenantMs - etat.debutMs >= etat.dureeMs) {
     repos();
-    return true;
+    if (!rappelActif) visible = true;  // sous un Rappel, le changement n'est pas encore visible
   }
-  return false;
+  return visible;
+}
+
+bool etatBouton(bool enfonce, unsigned long maintenantMs) {
+  if (enfonce == boutonEnfonce) return false;
+  if (boutonChangement && maintenantMs - boutonChangementMs < ANTI_REBOND_MS) return false;
+  boutonEnfonce = enfonce;
+  boutonChangement = true;
+  boutonChangementMs = maintenantMs;
+  if (!enfonce) return false;
+
+  if (morceauConnu) {
+    rappel = morceau;
+  } else {
+    rappel.expression = EXPR_SILENCE;
+    etatVersCp437("pas de musique", rappel.texte, TEXTE_MAX + 1);
+    rappel.ligne2[0] = '\0';
+    rappel.dureeMs = DUREE_SILENCE_MS;
+  }
+  rappel.temporaire = true;
+  rappel.debutMs = maintenantMs;
+  rappelActif = true;
+  return true;
 }
 
 const EtatCourant& etatCourant() {
-  return etat;
+  return rappelActif ? rappel : etat;
 }
 
 // Début du clignement dans le cycle : entre 1000 et 3000 ms (hachage du numéro de cycle).

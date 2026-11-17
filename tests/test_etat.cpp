@@ -347,6 +347,89 @@ static void test_son_durees_totales() {
   assert(etatDureeSon(SON_CARILLON) > 0 && etatDureeSon(SON_CARILLON) < 500);
 }
 
+// ---- Bouton et Rappel (ticket #21) ----
+
+static void test_rappel_musique_puis_retour() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Artiste");
+  etatMiseAJour(10000);  // l'Expression music expire : Repos
+  assert(etatCourant().expression == EXPR_REPOS);
+
+  assert(etatBouton(true, 20000));  // enfoncement : Rappel
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+  assert(strcmp(etatCourant().texte, "Titre") == 0);
+  assert(strcmp(etatCourant().ligne2, "Artiste") == 0);
+  assert(etatCourant().debutMs == 20000);
+  assert(etatSonCourant() == SON_AUCUN);
+
+  assert(!etatMiseAJour(29999));
+  assert(etatMiseAJour(30000));  // fin du Rappel : retour à l'Expression d'avant
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_rappel_silence_sans_music() {
+  etatInit();
+  assert(etatBouton(true, 1000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(strcmp(etatCourant().texte, "pas de musique") == 0);
+  assert(etatCourant().ligne2[0] == '\0');
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(3999));
+  assert(etatMiseAJour(4000));  // 3 s
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_rebonds_et_maintien_un_seul_rappel() {
+  etatInit();
+  assert(etatBouton(true, 1000));
+  assert(!etatBouton(false, 1010));  // rebond
+  assert(!etatBouton(true, 1020));   // rebond
+  assert(!etatBouton(true, 1500));   // maintenu
+  assert(etatCourant().debutMs == 1000);
+  assert(!etatBouton(false, 2000));  // relâché
+  assert(etatBouton(true, 2100));    // nouvel appui
+}
+
+static void test_bouton_nouvel_appui_relance_le_rappel() {
+  etatInit();
+  etatBouton(true, 1000);
+  etatBouton(false, 1100);
+  assert(etatBouton(true, 2000));
+  assert(etatCourant().debutMs == 2000);
+  assert(!etatMiseAJour(4999));  // 3 s depuis le second appui
+  assert(etatMiseAJour(5000));
+}
+
+static void test_rappel_pendant_waiting_retour_a_l_interpellation() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "projet", 0);
+  etatBouton(true, 1000);
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatMiseAJour(4000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "projet") == 0);
+}
+
+static void test_rappel_pendant_expression_qui_expire_retour_au_repos() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "p", 0);
+  etatBouton(true, 4000);                // Rappel de 4000 à 7000
+  assert(!etatMiseAJour(5000));          // done expire dessous : rien de visible
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatMiseAJour(7000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_rappel_evenement_qui_change_y_met_fin_working_sans_effet_non() {
+  etatInit();
+  etatBouton(true, 1000);
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 1500));  // sans effet
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatRecevoir(EV_GIT_PUSH, "main", 2000));
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(etatSonCourant() == SON_FANFARE);
+}
+
 int main() {
   test_son_fanfare_au_push_et_carillon_au_waiting();
   test_son_evenements_silencieux_ne_touchent_pas_au_son();
@@ -383,6 +466,13 @@ int main() {
   test_repos_clignement_ferme_puis_rouvre();
   test_push_temporaire_3s_puis_repos();
   test_push_fleche_reste_dans_zone_visage();
+  test_rappel_musique_puis_retour();
+  test_rappel_silence_sans_music();
+  test_bouton_rebonds_et_maintien_un_seul_rappel();
+  test_bouton_nouvel_appui_relance_le_rappel();
+  test_rappel_pendant_waiting_retour_a_l_interpellation();
+  test_rappel_pendant_expression_qui_expire_retour_au_repos();
+  test_rappel_evenement_qui_change_y_met_fin_working_sans_effet_non();
   puts("Tous les tests passent.");
   return 0;
 }
