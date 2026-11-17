@@ -43,6 +43,10 @@ git config --global hook.compagnon-push.command "$PWD/hooks/compagnon-push.sh"
 git config --global hook.compagnon-push.event reference-transaction
 ```
 
+**Attention** : le chemin doit rester valide. Si le script disparaît (dépôt déplacé, branche sans le script
+extraite…), git échoue partout (`commit`, `init`, `push`…) avec « la mise à jour a été abandonnée par le
+crochet reference-transaction ». Dans ce cas, retirer le hook (ci-dessous) ou corriger le chemin.
+
 Retrait :
 
 ```
