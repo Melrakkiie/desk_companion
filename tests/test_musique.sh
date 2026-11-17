@@ -53,11 +53,14 @@ URL="http://127.0.0.1:$(cat "$TMP/port")"
 
 # Le script boucle sans fin (relance de la source) : on attend les 2 Événements, puis on l'arrête.
 COMPAGNON_URL=$URL COMPAGNON_MUSIQUE_SOURCE="cat $TMP/lignes; sleep 30" lance
-attend "$TMP/log" 2
+attend "$TMP/log" 5
 sleep 0.5  # laisse passer un éventuel doublon
 arrete
-attendu=$'/event application/json {"type":"music","text":"Hyperballad","artist":"Björk"}\n/event application/json {"type":"music","text":"À quoi je sers…","artist":"Mylène Farmer"}'
-if [ "$(cat "$TMP/log")" = "$attendu" ]; then echo "ok   un Événement par morceau, accents, sans doublon ni renvoi après pause"
+M1='/event application/json {"type":"music","text":"Hyperballad","artist":"Björk"}'
+STOP='/event application/json {"type":"music_stop"}'
+# music, stop (pause), music (reprise), [doublon ignoré], stop (vide), music
+attendu=$(printf '%s\n' "$M1" "$STOP" "$M1" "$STOP" '/event application/json {"type":"music","text":"À quoi je sers…","artist":"Mylène Farmer"}')
+if [ "$(cat "$TMP/log")" = "$attendu" ]; then echo "ok   music par morceau, music_stop à la pause, music à la reprise, accents, sans doublon"
 else echo "ECHEC morceaux, reçu :"; cat "$TMP/log"; echec=1; fi
 
 # Compagnon injoignable : le script continue de tourner (même quand la source se termine et est relancée).
@@ -78,5 +81,16 @@ sleep 0.8  # laisse passer un éventuel doublon
 arrete
 if [ "$(cat "$TMP/log2")" = '/event application/json {"type":"music","text":"Hyperballad","artist":"Björk"}' ]; then echo "ok   cible rallumée : le morceau en attente part une seule fois"
 else echo "ECHEC reprise, reçu :"; cat "$TMP/log2"; echec=1; fi
+
+# Fin de la source (lecteur fermé) pendant la lecture : music_stop.
+: > "$TMP/log3"
+serveur "$TMP/log3" "$TMP/port3"
+for _ in $(seq 50); do [ -s "$TMP/port3" ] && break; sleep 0.1; done
+COMPAGNON_URL=http://127.0.0.1:$(cat "$TMP/port3") COMPAGNON_MUSIQUE_SOURCE="cat $TMP/une" COMPAGNON_MUSIQUE_RELANCE_S=30 lance
+attend "$TMP/log3" 2
+sleep 0.3
+arrete
+if [ "$(cat "$TMP/log3")" = "$(printf '%s\n' "$M1" "$STOP")" ]; then echo "ok   fin de la source : music_stop"
+else echo "ECHEC fin de source, reçu :"; cat "$TMP/log3"; echec=1; fi
 
 exit $echec
