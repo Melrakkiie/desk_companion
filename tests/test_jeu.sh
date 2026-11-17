@@ -81,6 +81,19 @@ cas 3 "manifest introuvable : Steam <id>" '/event application/json {"type":"game
 { proc /usr/bin/steam; proc "/opt/steam/reaper" SteamLaunch AppId=1493710 -- /proton; proc /usr/bin/bash; } > "$TMP/procs"
 cas 4 "client Steam et outils seulement : game_stop" '/event application/json {"type":"game_stop"}'
 
+# Lutris : argv[0] est python3, le nom du jeu suit l'argument `lutris-wrapper`.
+{ proc /usr/bin/python3 /app/bin/lutris; proc /usr/bin/bash -c "echo lutris-wrapper Fake 0 0"
+  proc /usr/bin/python3 /app/share/lutris/bin/lutris-wrapper "Guild Wars 2" 0 0 gamemoderun /x/umu-run /x/Gw2-64.exe; } > "$TMP/procs"
+cas 9 "jeu Lutris : game avec son nom (espaces conservés)" '/event application/json {"type":"game","text":"Guild Wars 2"}'
+
+{ proc bwrap --args 80 -- lutris; proc /usr/bin/python3 /app/bin/lutris; } > "$TMP/procs"
+cas 10 "client Lutris seul : game_stop" '/event application/json {"type":"game_stop"}'
+
+# Steam prioritaire, même si le processus Lutris est listé avant.
+{ proc /usr/bin/python3 /app/share/lutris/bin/lutris-wrapper "Guild Wars 2" 0 0 /x/Gw2-64.exe
+  proc "/opt/steam/reaper" SteamLaunch AppId=222 -- /jeu; } > "$TMP/procs"
+cas 11 "Steam et Lutris ensemble : un seul game, celui de Steam" '/event application/json {"type":"game","text":"Rivals of Aether II"}'
+
 # Changement : un jeu qui se lance puis se ferme est annoncé tout de suite (renvoi à 30 s).
 : > "$TMP/procs"
 nouveau_serveur 5

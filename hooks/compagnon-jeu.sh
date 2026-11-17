@@ -7,6 +7,7 @@
 #
 # Jeu Steam : processus `reaper SteamLaunch AppId=<id>` (vérifié, natif et Proton) ; nom lu dans le champ
 # `name` de appmanifest_<id>.acf des bibliothèques de libraryfolders.vdf, sinon `Steam <id>`.
+# Jeu Lutris : argument `lutris-wrapper`, suivi du nom du jeu. Steam prime si les deux tournent.
 #
 # Cible : http://compagnon.local, remplaçable par la variable COMPAGNON_URL (tests).
 # Période de renvoi (10 s par défaut) : COMPAGNON_JEU_RENVOI_S (secondes, décimales permises) ;
@@ -51,16 +52,28 @@ jeu_steam() {
   [[ $outils == *" ${BASH_REMATCH[1]} "* ]] && return 1
   nom_steam "${BASH_REMATCH[1]}"
 }
-matchers=(jeu_steam)
 
-# Nom du premier jeu trouvé parmi les processus de la source ; échoue s'il n'y en a pas.
+# Jeu Lutris (vérifié, tous runners) : argv[0] est python3 ; l'argument de basename `lutris-wrapper` est
+# suivi du nom du jeu (un seul argument). Le client Lutris seul n'a pas ce wrapper.
+jeu_lutris() {
+  local i
+  for ((i = 1; i < $#; i++)); do
+    [ "${!i##*/}" = lutris-wrapper ] && { printf '%s\n' "${@:i+1:1}"; return 0; }
+  done
+  return 1
+}
+matchers=(jeu_steam jeu_lutris)  # par ordre de priorité : Steam l'emporte sur Lutris
+
+# Nom du premier jeu trouvé (matchers dans l'ordre, puis processus) ; échoue s'il n'y en a pas.
 trouver_jeu() {
-  local args m nom
-  while IFS=$sep read -r -a args; do
-    for m in "${matchers[@]}"; do
+  local ligne args m nom lignes=()
+  mapfile -t lignes < <(bash -c "$source_cmd" 2>/dev/null)
+  for m in "${matchers[@]}"; do
+    for ligne in "${lignes[@]}"; do
+      IFS=$sep read -r -a args <<< "$ligne"
       nom=$("$m" "${args[@]}") && { printf '%s\n' "$nom"; return 0; }
     done
-  done < <(bash -c "$source_cmd" 2>/dev/null)
+  done
   return 1
 }
 
