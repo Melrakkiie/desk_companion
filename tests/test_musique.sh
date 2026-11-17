@@ -101,6 +101,18 @@ arrete
 if [ "$(sort -u "$TMP/log5")" = "$STOP" ] && [ "$(wc -l < "$TMP/log5")" -ge 3 ]; then echo "ok   sans lecture : music_stop renvoyé périodiquement"
 else echo "ECHEC renvoi music_stop, reçu :"; cat "$TMP/log5"; echec=1; fi
 
+# Sans lecteur (la source se termine aussitôt, relancée toutes les 0,1 s) : music_stop à la cadence
+# de renvoi (1 s), pas à celle de la relance. En 2,5 s : 3 envois attendus (t=0, 1, 2), jamais ~25.
+: > "$TMP/log6"
+serveur "$TMP/log6" "$TMP/port6"
+for _ in $(seq 50); do [ -s "$TMP/port6" ] && break; sleep 0.1; done
+COMPAGNON_URL=http://127.0.0.1:$(cat "$TMP/port6") COMPAGNON_MUSIQUE_RENVOI_S=1 COMPAGNON_MUSIQUE_RELANCE_S=0.1 COMPAGNON_MUSIQUE_SOURCE="true" lance
+sleep 2.5
+arrete
+n=$(wc -l < "$TMP/log6")
+if [ "$(sort -u "$TMP/log6")" = "$STOP" ] && [ "$n" -ge 2 ] && [ "$n" -le 4 ]; then echo "ok   sans lecteur : music_stop à la cadence de renvoi, pas de relance"
+else echo "ECHEC cadence sans lecteur ($n envois), reçu :"; cat "$TMP/log6"; echec=1; fi
+
 # Fin de la source (lecteur fermé) pendant la lecture : music_stop.
 : > "$TMP/log3"
 serveur "$TMP/log3" "$TMP/port3"
