@@ -90,6 +90,13 @@ static void dessinerMusique(const EtatCourant& e, unsigned long maintenantMs) {
   dessinerNote(112, CENTRE_Y - 6 + rebond);
 }
 
+// silence (Rappel sans Morceau courant) : visage de Repos avec une note barrée
+static void dessinerSilence(const EtatCourant& e, unsigned long maintenantMs) {
+  dessinerRepos(e, maintenantMs);
+  dessinerNote(64, CENTRE_Y + 14);
+  ecran.drawLine(50, CENTRE_Y + 18, 78, CENTRE_Y - 8, SSD1306_WHITE);
+}
+
 // git_push : yeux qui regardent vers le haut (pupilles en haut) et flèche qui monte entre eux
 static void dessinerPush(const EtatCourant& e, unsigned long maintenantMs) {
   const int yeuxY = CENTRE_Y - 6;
@@ -121,6 +128,7 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
     case EXPR_INTERPELLE: dessinerInterpelle(e, maintenantMs); break;
     case EXPR_MUSIQUE:    dessinerMusique(e, maintenantMs); break;
     case EXPR_PUSH:       dessinerPush(e, maintenantMs); break;
+    case EXPR_SILENCE:    dessinerSilence(e, maintenantMs); break;
     case EXPR_REPOS:
     default:              dessinerRepos(e, maintenantMs); break;
   }

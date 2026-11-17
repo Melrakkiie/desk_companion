@@ -9,6 +9,11 @@
 const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
 const unsigned long DUREE_GIT_PUSH_MS = 3000;
 const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
+const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (aucun Morceau courant)
+// Le PC renvoie l'état de lecture (music ou music_stop) toutes les 10 s (hook, hors module) ;
+// sans aucune nouvelle pendant 30 s, le Compagnon oublie le Morceau courant (3 renvois manqués).
+const unsigned long OUBLI_MORCEAU_MS = 30000;
+const unsigned long ANTI_REBOND_MS = 50;  // Bouton : changements de niveau ignorés après un changement accepté
 const unsigned long PERIODE_ANIM_MS = 33;    // redessin périodique (~30 images/s)
 // Clignement du Repos : un par cycle, à un instant irrégulier du cycle.
 const unsigned long PERIODE_CLIGNEMENT_MS = 4000;
@@ -55,7 +60,8 @@ enum TypeEvenement {
   EV_CLAUDE_WAITING,
   EV_CLAUDE_WORKING,
   EV_MUSIC,
-  EV_GIT_PUSH
+  EV_GIT_PUSH,
+  EV_MUSIC_STOP
 };
 
 enum Expression {
@@ -63,7 +69,8 @@ enum Expression {
   EXPR_CONTENT,     // claude_done
   EXPR_INTERPELLE,  // claude_waiting (ticket #7)
   EXPR_MUSIQUE,     // music (ticket #8)
-  EXPR_PUSH         // git_push (ticket #9)
+  EXPR_PUSH,        // git_push (ticket #9)
+  EXPR_SILENCE      // Rappel sans Morceau courant : jamais issue d'un Événement
 };
 
 struct EtatCourant {
@@ -98,8 +105,9 @@ Son etatSonCourant();
 // Fréquence à jouer maintenant pour le Son courant (0 = silence).
 unsigned int etatFrequence(unsigned long maintenantMs);
 
-// Remet l'État au Repos et le Son à SON_AUCUN.
-void etatInit();
+// Remet l'État au Repos et le Son à SON_AUCUN. boutonEnfonceAuDemarrage : niveau du Bouton à cet
+// instant ; un Bouton déjà tenu ne montre pas de Rappel (il faut le relâcher puis le renfoncer).
+void etatInit(bool boutonEnfonceAuDemarrage = false);
 
 // Applique un Événement (le dernier gagne). Renvoie vrai si l'Expression a changé.
 // texte et artiste peuvent être nullptr.
@@ -109,6 +117,13 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
 // À appeler à chaque tour de loop() : renvoie vrai si l'Expression a changé (retour au Repos).
 bool etatMiseAJour(unsigned long maintenantMs);
 
+// Bouton : à appeler à chaque tour de loop() avec le niveau brut (vrai = enfoncé) et l'heure.
+// Anti-rebond et front d'appui sont ici. L'enfoncement montre un Rappel (musique du Morceau
+// courant, sinon silence) ; un bouton maintenu ou qui rebondit n'en montre qu'un seul.
+// Renvoie vrai si l'affichage change.
+bool etatBouton(bool enfonce, unsigned long maintenantMs);
+
+// Expression à afficher : le Rappel s'il y en a un, sinon l'Expression courante.
 const EtatCourant& etatCourant();
 
 // Clignement du Repos (ticket #6) : sans état, dépend seulement de l'heure.

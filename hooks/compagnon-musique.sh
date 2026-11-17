@@ -1,49 +1,64 @@
 #!/usr/bin/env bash
-# Lecteur multimédia -> Compagnon. Suit `playerctl --follow metadata` (MPRIS) et envoie un
-# Événement `music` (titre + artiste) en POST /event à chaque changement de morceau,
-# en arrière-plan, sans jamais s'arrêter ni bloquer, même si le Compagnon est injoignable.
+# Lecteur multimédia -> Compagnon. Suit `playerctl --follow metadata` (MPRIS) et envoie en POST /event
+# l'état de lecture : `music` (titre + artiste) si un morceau joue, `music_stop` sinon (pause, arrêt,
+# sans titre, lecteur fermé). Envoi à chaque changement, puis renvoi de l'état courant toutes les 10 s :
+# le Compagnon rattrape ainsi l'état réel après un redémarrage, un envoi perdu ou une cible injoignable,
+# et reconnaît lui-même un morceau déjà connu (le script ne garde aucune mémoire de ce qu'il a envoyé).
+# Tourne en arrière-plan, sans jamais s'arrêter ni bloquer, même si le Compagnon est injoignable.
 #
 # Cible : http://compagnon.local, remplaçable par la variable COMPAGNON_URL (tests).
+# Période de renvoi (10 s par défaut) : COMPAGNON_MUSIQUE_RENVOI_S (secondes, décimales permises).
 # Variables de test : COMPAGNON_MUSIQUE_SOURCE (commande qui remplace playerctl),
-# COMPAGNON_MUSIQUE_RELANCE_S (attente avant de relancer la source),
-# COMPAGNON_MUSIQUE_REESSAI_S (attente avant de renvoyer un morceau que la cible n'a pas reçu).
+# COMPAGNON_MUSIQUE_RELANCE_S (attente avant de relancer la source).
 
 delai_curl_s=2  # abandonne la requête après 2 s, comme compagnon-hook.sh
 relance_s=${COMPAGNON_MUSIQUE_RELANCE_S:-5}
-reessai_s=${COMPAGNON_MUSIQUE_REESSAI_S:-5}  # délai entre deux essais tant que le Compagnon est injoignable
+renvoi_s=${COMPAGNON_MUSIQUE_RENVOI_S:-10}  # période de renvoi ; garder < 30 s (oubli côté Compagnon)
 
 # Séparateur de champs : \x1f n'est pas un blanc, donc `read` garde un artiste vide
 # (une tabulation serait avalée) et les accents passent tels quels.
 sep=$'\x1f'
 source_cmd=${COMPAGNON_MUSIQUE_SOURCE:-"playerctl --follow metadata --format '{{status}}${sep}{{artist}}${sep}{{title}}'"}
 
-dernier=""      # « artiste<sep>titre » du dernier morceau reçu par la cible (survit aux relances)
-en_attente=""   # morceau courant pas encore reçu par la cible (corps dans $corps)
+corps_stop='{"type":"music_stop"}'
+corps=$corps_stop  # état courant à annoncer (survit aux relances de la source)
+renvoi_us=$(awk -v s="$renvoi_s" 'BEGIN{printf "%d", s*1000000}')
+dernier_envoi_us=0
+
+# Synchrone, borné par --max-time ; un échec est sans conséquence : le renvoi suivant rattrape.
+envoyer() {
+  dernier_envoi_us=${EPOCHREALTIME/[.,]/}  # microsecondes, quel que soit le séparateur décimal local
+  curl -sf -o /dev/null --max-time "$delai_curl_s" -X POST -H 'Content-Type: application/json' \
+    -d "$corps" "${COMPAGNON_URL:-http://compagnon.local}/event" >/dev/null 2>&1
+  return 0
+}
 
 while true; do
   # `playerctl --follow` se termine quand le dernier lecteur se ferme (ou s'il n'y en a pas) :
   # on attend puis on relance, au lieu de mourir.
   while true; do
-    IFS=$sep read -r -t "$reessai_s" statut artiste titre
+    IFS=$sep read -r -t "$renvoi_s" statut artiste titre
     rc=$?
     if [ $rc -eq 0 ]; then
-      # Pause, arrêt ou métadonnées vides : rien à envoyer (ni à réessayer).
-      # La reprise d'un morceau déjà envoyé ne renvoie rien.
-      en_attente=""
-      [ "$statut" = Playing ] && [ -n "$titre" ] || continue
-      [ "$artiste$sep$titre" = "$dernier" ] && continue
-      corps=$(jq -nc --arg text "$titre" --arg artist "$artiste" \
-        '{type: "music", text: $text, artist: $artist}' 2>/dev/null) || continue
-      en_attente="$artiste$sep$titre"
+      # Lecture : music (reprise d'un morceau après pause : renvoyé) ; sinon music_stop.
+      if [ "$statut" = Playing ] && [ -n "$titre" ]; then
+        corps_music=$(jq -nc --arg text "$titre" --arg artist "$artiste" \
+          '{type: "music", text: $text, artist: $artist}' 2>/dev/null) || continue
+        corps=$corps_music
+      else
+        corps=$corps_stop
+      fi
     elif [ $rc -le 128 ]; then
-      break  # fin de la source
+      # Fin de la source : plus de lecteur. music_stop tout de suite si l'état change, sinon
+      # seulement à la cadence de renvoi (la source est relancée plus souvent, toutes les relance_s).
+      if [ "$corps" != "$corps_stop" ] || [ $((${EPOCHREALTIME/[.,]/} - dernier_envoi_us)) -ge "$renvoi_us" ]; then
+        corps=$corps_stop
+        envoyer
+      fi
+      break
     fi
-    # Délai dépassé (rc > 128) ou nouveau morceau : (ré)essai du morceau en attente.
-    # Synchrone, borné par --max-time ; il n'est « envoyé » qu'une fois curl réussi (-f).
-    [ -n "$en_attente" ] || continue
-    curl -sf -o /dev/null --max-time "$delai_curl_s" -X POST -H 'Content-Type: application/json' \
-      -d "$corps" "${COMPAGNON_URL:-http://compagnon.local}/event" >/dev/null 2>&1 \
-      && { dernier=$en_attente; en_attente=""; }
+    # Nouvel état ou délai dépassé (rc > 128) : (ré)envoi de l'état courant.
+    envoyer
   done < <(bash -c "$source_cmd" 2>/dev/null)
   sleep "$relance_s"
 done

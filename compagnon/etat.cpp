@@ -1,7 +1,26 @@
 #include "etat.h"
 #include <string.h>
 
-static EtatCourant etat;
+static EtatCourant etat;  // l'Expression courante, que le Rappel recouvre sans la toucher
+
+// Rappel (appui sur le Bouton) et Morceau connu : le dernier music reçu, en pause compris (copie de etat) ;
+// seul un Morceau connu non en pause est le Morceau courant (voir GLOSSARY.md).
+static EtatCourant rappel;
+static bool rappelActif = false;
+static EtatCourant morceau;
+static bool morceauConnu = false;
+static bool morceauEnPause = false;  // connu mais plus courant (music_stop)
+static unsigned long nouvellesMusiqueMs = 0;  // dernier music ou music_stop reçu
+
+// Sans nouvelles depuis OUBLI_MORCEAU_MS : le morceau n'est plus connu (le prochain music s'affiche).
+static void oublierSiPerime(unsigned long maintenantMs) {
+  if (morceauConnu && maintenantMs - nouvellesMusiqueMs >= OUBLI_MORCEAU_MS) morceauConnu = false;
+}
+
+// Anti-rebond du Bouton
+static bool boutonEnfonce = false;
+static bool boutonChangement = false;  // un changement accepté a déjà eu lieu
+static unsigned long boutonChangementMs = 0;
 
 // Lettres non ASCII disponibles en CP437 : {point de code Unicode, octet CP437}.
 static const struct { unsigned int unicode; unsigned char cp437; } TABLE_CP437[] = {
@@ -71,14 +90,19 @@ unsigned int etatFrequence(unsigned long maintenantMs) {
   return etatFrequenceSon(sonCourant, maintenantMs - sonDebutMs);
 }
 
+// Les deux lignes du Bandeau en CP437 : ligne 1 = texte jusqu'au premier '\n' ; ligne 2 = le texte
+// après ce '\n', sinon l'artiste. texte et artiste peuvent être nullptr.
+static void lignesBandeau(const char* texte, const char* artiste, char* l1, char* l2) {
+  etatVersCp437(texte, l1, TEXTE_MAX + 1);
+  const char* saut = texte == nullptr ? nullptr : strchr(texte, '\n');
+  etatVersCp437(saut != nullptr ? saut + 1 : artiste, l2, TEXTE_MAX + 1);
+}
+
 static void installer(Expression expression, const char* texte, bool temporaire,
                       unsigned long maintenantMs, unsigned long dureeMs,
                       const char* artiste = nullptr) {
   etat.expression = expression;
-  etatVersCp437(texte, etat.texte, TEXTE_MAX + 1);
-  // Ligne 2 : le texte après le premier '\n', sinon l'artiste
-  const char* saut = texte == nullptr ? nullptr : strchr(texte, '\n');
-  etatVersCp437(saut != nullptr ? saut + 1 : artiste, etat.ligne2, TEXTE_MAX + 1);
+  lignesBandeau(texte, artiste, etat.texte, etat.ligne2);
   etat.temporaire = temporaire;
   etat.debutMs = maintenantMs;
   etat.dureeMs = dureeMs;
@@ -89,15 +113,20 @@ static void repos() {
   installer(EXPR_REPOS, nullptr, false, 0, 0);
 }
 
-void etatInit() {
+void etatInit(bool boutonEnfonceAuDemarrage) {
   repos();
   sonCourant = SON_AUCUN;
+  rappelActif = false;
+  morceauConnu = false;
+  morceauEnPause = false;
+  boutonEnfonce = boutonEnfonceAuDemarrage;  // tenu au démarrage : pas de front d'appui
+  boutonChangement = false;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
-  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push"};
+  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop"};
   if (nom == nullptr) return false;
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 6; i++) {
     if (strcmp(nom, NOMS[i]) == 0) {
       *type = (TypeEvenement)i;  // l'ordre de NOMS suit celui de l'enum TypeEvenement
       return true;
@@ -128,8 +157,8 @@ unsigned long etatDureeMusique(const char* ligne1, const char* ligne2) {
   return deux > DUREE_MUSIC_MS ? deux : DUREE_MUSIC_MS;
 }
 
-bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
-                  const char* artiste) {
+static bool recevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
+                     const char* artiste) {
   switch (type) {
     case EV_CLAUDE_DONE:
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
@@ -138,11 +167,30 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
       installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
       demarrerSon(SON_FANFARE, maintenantMs);
       return true;
-    case EV_MUSIC:
+    case EV_MUSIC: {
+      // Même morceau que le connu (reprise après pause) : redevient courant, sans réaffichage.
+      oublierSiPerime(maintenantMs);
+      nouvellesMusiqueMs = maintenantMs;
+      char l1[TEXTE_MAX + 1], l2[TEXTE_MAX + 1];
+      lignesBandeau(texte, artiste, l1, l2);
+      if (morceauConnu && strcmp(l1, morceau.texte) == 0 && strcmp(l2, morceau.ligne2) == 0) {
+        morceauEnPause = false;
+        return false;
+      }
       installer(EXPR_MUSIQUE, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
       // la durée dépend des textes tronqués réellement conservés
       etat.dureeMs = etatDureeMusique(etat.texte, etat.ligne2);
+      morceau = etat;
+      morceauConnu = true;
+      morceauEnPause = false;
       return true;
+    }
+    // Pause ou arrêt : le morceau reste connu mais n'est plus courant ; l'Expression ne change pas.
+    case EV_MUSIC_STOP:
+      oublierSiPerime(maintenantMs);
+      nouvellesMusiqueMs = maintenantMs;
+      morceauEnPause = true;
+      return false;
     // Expression persistante : reste jusqu'au prochain Événement.
     // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne
     // (un claude_working d'une session peut effacer le claude_waiting d'une autre).
@@ -159,16 +207,53 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
   return false;  // inatteignable : tous les types sont traités ci-dessus
 }
 
+// Un Événement qui change l'Expression met fin au Rappel ; sans effet (false), il ne l'interrompt pas.
+bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
+                  const char* artiste) {
+  bool change = recevoir(type, texte, maintenantMs, artiste);
+  if (change) rappelActif = false;
+  return change;
+}
+
 bool etatMiseAJour(unsigned long maintenantMs) {
+  oublierSiPerime(maintenantMs);
+  bool visible = false;
+  if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
+    rappelActif = false;
+    visible = true;
+  }
   if (etat.temporaire && maintenantMs - etat.debutMs >= etat.dureeMs) {
     repos();
-    return true;
+    if (!rappelActif) visible = true;  // sous un Rappel, le changement n'est pas encore visible
   }
-  return false;
+  return visible;
+}
+
+bool etatBouton(bool enfonce, unsigned long maintenantMs) {
+  if (enfonce == boutonEnfonce) return false;
+  if (boutonChangement && maintenantMs - boutonChangementMs < ANTI_REBOND_MS) return false;
+  boutonEnfonce = enfonce;
+  boutonChangement = true;
+  boutonChangementMs = maintenantMs;
+  if (!enfonce) return false;
+
+  oublierSiPerime(maintenantMs);
+  if (morceauConnu && !morceauEnPause) {
+    rappel = morceau;
+  } else {
+    rappel.expression = EXPR_SILENCE;
+    etatVersCp437("pas de musique", rappel.texte, TEXTE_MAX + 1);
+    rappel.ligne2[0] = '\0';
+    rappel.dureeMs = DUREE_SILENCE_MS;
+  }
+  rappel.temporaire = true;
+  rappel.debutMs = maintenantMs;
+  rappelActif = true;
+  return true;
 }
 
 const EtatCourant& etatCourant() {
-  return etat;
+  return rappelActif ? rappel : etat;
 }
 
 // Début du clignement dans le cycle : entre 1000 et 3000 ms (hachage du numéro de cycle).

@@ -6,6 +6,8 @@
 #include "expressions.h"
 #include "reseau.h"
 
+const int BROCHE_BOUTON = 27;  // entre D27 et GND, lu en INPUT_PULLUP (enfoncé = niveau bas)
+
 static bool dernierEtatWifi = true;  // forcé à l'opposé au premier tour pour dessiner
 
 // Cadence du redessin périodique : PERIODE_ANIM_MS (etat.h).
@@ -27,7 +29,8 @@ void setup() {
   if (!expressionsInit()) {
     Serial.println("Écran : introuvable (voir câblage, adresse 0x3C)");
   }
-  etatInit();
+  pinMode(BROCHE_BOUTON, INPUT_PULLUP);
+  etatInit(digitalRead(BROCHE_BOUTON) == LOW);
   buzzerInit();
   reseauInit();
   apiInit();
@@ -38,6 +41,7 @@ void loop() {
   reseauMiseAJour();
   bool aRedessiner = apiMiseAJour();
   aRedessiner |= etatMiseAJour(millis());
+  aRedessiner |= etatBouton(digitalRead(BROCHE_BOUTON) == LOW, millis());
   buzzerJouer(etatFrequence(millis()));  // Son courant, sans bloquer la boucle
 
   bool connecte = reseauConnecte();
