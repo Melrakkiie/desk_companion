@@ -82,3 +82,28 @@ systemctl --user enable --now compagnon-musique.service
 ```
 
 Arrêt et retrait : `systemctl --user disable --now compagnon-musique.service`.
+
+## Jeu (Steam)
+
+`compagnon-jeu.sh` lit les processus (`/proc/*/cmdline`) et envoie `game` (nom du jeu) tant qu'un jeu lancé
+par Steam, natif ou Proton, tourne, `game_stop` sinon (client Steam seul compris). Le jeu est le processus
+`reaper SteamLaunch AppId=<id>` ; son nom vient du champ `name` de `appmanifest_<id>.acf` dans les
+bibliothèques de `libraryfolders.vdf` (`Steam <id>` si le manifest est introuvable, par exemple disque
+démonté). Les outils Steam (Proton, Steam Linux Runtime, Redistributables) ne comptent pas comme jeux.
+Envoi à chaque changement (lecture des processus toutes les 2 s : `COMPAGNON_JEU_SCAN_S`), puis renvoi de
+l'état toutes les 10 s (`COMPAGNON_JEU_RENVOI_S`, à garder sous les 30 s au bout desquelles le Compagnon
+oublie le jeu). Si le Compagnon est injoignable, le script continue.
+Dépendances : `gawk`, `jq`, `curl`. Cible : `COMPAGNON_URL`. Racine de Steam : `COMPAGNON_JEU_STEAM_DIR`
+(`~/.local/share/Steam` par défaut).
+
+Lancement à l'ouverture de session (adapter le chemin dans `compagnon-jeu.service` si le dépôt est ailleurs) :
+
+```
+chmod +x hooks/compagnon-jeu.sh
+mkdir -p ~/.config/systemd/user
+cp hooks/compagnon-jeu.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now compagnon-jeu.service
+```
+
+Arrêt et retrait : `systemctl --user disable --now compagnon-jeu.service`.
