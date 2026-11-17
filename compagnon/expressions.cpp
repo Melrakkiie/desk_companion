@@ -62,6 +62,31 @@ static void dessinerInterpelle(const EtatCourant& e, unsigned long maintenantMs)
   ecran.drawCircle(64, CENTRE_Y + 15, 5, SSD1306_WHITE);
 }
 
+// Jeu : yeux du Repos mi-clos sous des sourcils froncés (même clignement que le Repos),
+// bouche serrée, petite manette en bas à droite (à côté du visage, pour ne pas passer pour une bouche)
+static void dessinerJeu(const EtatCourant& e, unsigned long maintenantMs) {
+  (void)e;
+  if (etatYeuxFermes(maintenantMs)) {
+    ecran.fillRect(33, CENTRE_Y - 7, 15, 3, SSD1306_WHITE);
+    ecran.fillRect(81, CENTRE_Y - 7, 15, 3, SSD1306_WHITE);
+  } else {
+    ecran.fillCircle(40, CENTRE_Y - 6, 7, SSD1306_WHITE);
+    ecran.fillCircle(88, CENTRE_Y - 6, 7, SSD1306_WHITE);
+    ecran.fillRect(32, CENTRE_Y - 13, 64, 5, SSD1306_BLACK);  // paupières : moitié haute masquée
+  }
+  for (int d = 0; d < 2; d++) {  // sourcils froncés, fixes pendant le clignement
+    ecran.drawLine(30, CENTRE_Y - 17 + d, 48, CENTRE_Y - 13 + d, SSD1306_WHITE);
+    ecran.drawLine(98, CENTRE_Y - 17 + d, 80, CENTRE_Y - 13 + d, SSD1306_WHITE);
+  }
+  ecran.drawFastHLine(58, CENTRE_Y + 14, 12, SSD1306_WHITE);
+  // manette : corps arrondi, croix à gauche, deux boutons à droite
+  ecran.fillRoundRect(101, CENTRE_Y + 6, 25, 13, 4, SSD1306_WHITE);
+  ecran.fillRect(104, CENTRE_Y + 11, 7, 3, SSD1306_BLACK);
+  ecran.fillRect(106, CENTRE_Y + 9, 3, 7, SSD1306_BLACK);
+  ecran.fillCircle(117, CENTRE_Y + 14, 1, SSD1306_BLACK);
+  ecran.fillCircle(121, CENTRE_Y + 11, 1, SSD1306_BLACK);
+}
+
 // Une ligne du Bandeau : fixe si elle tient, sinon défile en boucle (2 copies côte à côte)
 static void ligneDefilante(const char* texte, int y, unsigned long tempsMs) {
   int largeur = etatLargeurTexte(texte);
@@ -128,6 +153,7 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
     case EXPR_INTERPELLE: dessinerInterpelle(e, maintenantMs); break;
     case EXPR_MUSIQUE:    dessinerMusique(e, maintenantMs); break;
     case EXPR_PUSH:       dessinerPush(e, maintenantMs); break;
+    case EXPR_JEU:        dessinerJeu(e, maintenantMs); break;
     case EXPR_SILENCE:    dessinerSilence(e, maintenantMs); break;
     case EXPR_REPOS:
     default:              dessinerRepos(e, maintenantMs); break;

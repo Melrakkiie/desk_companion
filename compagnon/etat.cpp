@@ -17,6 +17,11 @@ static void oublierSiPerime(unsigned long maintenantMs) {
   if (morceauConnu && maintenantMs - nouvellesMusiqueMs >= OUBLI_MORCEAU_MS) morceauConnu = false;
 }
 
+// Jeu courant : le dernier game reçu, tant qu'il n'est ni arrêté (game_stop) ni oublié.
+static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
+static bool jeuConnu = false;
+static unsigned long nouvellesJeuMs = 0;  // dernier game reçu
+
 // Anti-rebond du Bouton
 static bool boutonEnfonce = false;
 static bool boutonChangement = false;  // un changement accepté a déjà eu lieu
@@ -113,20 +118,41 @@ static void repos() {
   installer(EXPR_REPOS, nullptr, false, 0, 0);
 }
 
+// Jeu : ni temporaire ni persistante, c'est le point de retour ; nom du jeu seul dans le Bandeau (jeuNom est déjà en CP437).
+static void jeu(unsigned long maintenantMs) {
+  installer(EXPR_JEU, nullptr, false, maintenantMs, 0);
+  strcpy(etat.texte, jeuNom);
+}
+
+// Point de retour : Jeu s'il y a un Jeu courant, sinon le Repos.
+static void retour(unsigned long maintenantMs) {
+  if (jeuConnu) jeu(maintenantMs);
+  else repos();
+}
+
+// Oublie le Jeu courant (game_stop ou oubli après OUBLI_JEU_MS) ; vrai si l'Expression Jeu cède la place au Repos.
+static bool oublierJeu() {
+  jeuConnu = false;
+  if (etat.expression != EXPR_JEU) return false;
+  repos();
+  return true;
+}
+
 void etatInit(bool boutonEnfonceAuDemarrage) {
   repos();
   sonCourant = SON_AUCUN;
   rappelActif = false;
   morceauConnu = false;
   morceauEnPause = false;
+  jeuConnu = false;
   boutonEnfonce = boutonEnfonceAuDemarrage;  // tenu au démarrage : pas de front d'appui
   boutonChangement = false;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
-  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop"};
+  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop"};
   if (nom == nullptr) return false;
-  for (int i = 0; i < 6; i++) {
+  for (unsigned i = 0; i < sizeof(NOMS) / sizeof(*NOMS); i++) {
     if (strcmp(nom, NOMS[i]) == 0) {
       *type = (TypeEvenement)i;  // l'ordre de NOMS suit celui de l'enum TypeEvenement
       return true;
@@ -201,8 +227,24 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     // Ramène au Repos seulement si on attend ; sinon sans effet (l'API répond quand même 200).
     case EV_CLAUDE_WORKING:
       if (etat.expression != EXPR_INTERPELLE) return false;
-      repos();
+      retour(maintenantMs);
       return true;
+    // Ne changent que le point de retour ; Jeu ne s'affiche tout de suite qu'au Repos (ou sur place).
+    case EV_GAME: {
+      char nom[TEXTE_MAX + 1];
+      etatVersCp437(texte, nom, TEXTE_MAX + 1);
+      bool memeNom = jeuConnu && strcmp(nom, jeuNom) == 0;
+      strcpy(jeuNom, nom);
+      jeuConnu = true;
+      nouvellesJeuMs = maintenantMs;
+      if (etat.expression == EXPR_REPOS || (etat.expression == EXPR_JEU && !memeNom)) {
+        jeu(maintenantMs);
+        return true;
+      }
+      return false;
+    }
+    case EV_GAME_STOP:
+      return oublierJeu();
   }
   return false;  // inatteignable : tous les types sont traités ci-dessus
 }
@@ -211,6 +253,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
 bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
                   const char* artiste) {
   bool change = recevoir(type, texte, maintenantMs, artiste);
+  if (type == EV_GAME || type == EV_GAME_STOP) return change && !rappelActif;  // le Rappel continue
   if (change) rappelActif = false;
   return change;
 }
@@ -218,12 +261,15 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
 bool etatMiseAJour(unsigned long maintenantMs) {
   oublierSiPerime(maintenantMs);
   bool visible = false;
+  if (jeuConnu && maintenantMs - nouvellesJeuMs >= OUBLI_JEU_MS) {  // même effet qu'un game_stop
+    if (oublierJeu()) visible = !rappelActif;
+  }
   if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
     rappelActif = false;
     visible = true;
   }
   if (etat.temporaire && maintenantMs - etat.debutMs >= etat.dureeMs) {
-    repos();
+    retour(maintenantMs);
     if (!rappelActif) visible = true;  // sous un Rappel, le changement n'est pas encore visible
   }
   return visible;
