@@ -122,12 +122,25 @@ static void dessinerInterpelle(const EtatCourant& e, unsigned long maintenantMs)
   ecran.fillRect(112, ZONE_VISAGE_Y + 28, 4, 4, SSD1306_WHITE);
 }
 
-// Jeu : la Boule concentrée, yeux mi-clos sous des sourcils froncés (même clignement que
-// le Repos), bouche serrée, petite manette en bas à droite, à côté d'elle
+// Casque de gamer : serre-tête en demi-cercle (haut à y = 18, reste dans la Zone visage),
+// oreillettes cerclées de noir sur les côtés du corps, micro noir vers la bouche
+static void bouleCasque() {
+  for (int r = 25; r <= 26; r++) ecran.drawCircleHelper(BOULE_X, 44, r, 0x1 | 0x2, SSD1306_WHITE);
+  for (int x : {34, 86}) {
+    ecran.fillRoundRect(x, 38, 9, 15, 3, SSD1306_WHITE);
+    ecran.drawRoundRect(x, 38, 9, 15, 3, SSD1306_BLACK);
+  }
+  ecran.drawLine(40, 50, 54, 53, SSD1306_BLACK);
+  ecran.fillCircle(55, 53, 1, SSD1306_BLACK);
+}
+
+// Jeu : la Boule concentrée, casque de gamer sur la tête, yeux mi-clos sous des sourcils
+// froncés (même clignement que le Repos), bouche serrée, petite manette en bas à droite
 static void dessinerJeu(const EtatCourant& e, unsigned long maintenantMs) {
   (void)e;
   bool fermes = etatYeuxFermes(maintenantMs);
   bouleCorps(0);
+  bouleCasque();
   bouleYeux(0, fermes);
   if (!fermes) ecran.fillRect(BOULE_X - 12, YEUX_Y - 4, 25, 4, SSD1306_WHITE);  // paupières
   ecran.drawLine(BOULE_X - 12, YEUX_Y - 7, BOULE_X - 5, YEUX_Y - 5, SSD1306_BLACK);  // sourcils
