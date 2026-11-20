@@ -18,11 +18,15 @@ sans toucher aux autres. Vérifier le chemin du script, puis `chmod +x hooks/com
 ```
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_done","text":"projet"}' http://compagnon.local/event
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_waiting","text":"autorisation ?\nprojet"}' http://compagnon.local/event
-curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_waiting","text":"à toi !\nprojet"}' http://compagnon.local/event
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_working","text":"projet"}' http://compagnon.local/event
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"music","text":"Titre","artist":"Artiste"}' http://compagnon.local/event
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"git_push","text":"main"}' http://compagnon.local/event
 ```
+
+`Stop` et `StopFailure` (tour fini sur une erreur d'API) envoient `claude_done` ; seule la notification
+`permission_prompt` envoie `claude_waiting` (`idle_prompt`, « saisie inactive depuis ~60 s », est ignorée :
+elle arrive aussi quand la Session n'attend rien). Limite connue : une interruption (Échap) ne déclenche aucun
+hook, la Session reste « travaille » jusqu'à son prochain Événement.
 
 Les Événements Claude portent le `session_id` du hook dans `session` (chaîne, facultatif : absent = Session anonyme) ; le Compagnon suit l'attente de chaque Session séparément.
 

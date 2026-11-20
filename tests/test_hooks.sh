@@ -38,12 +38,15 @@ verifie() {
 verifie "Stop -> claude_done" \
   '{"hook_event_name":"Stop","session_id":"s1","cwd":"/home/a/Projects/mon_projet"}' \
   '/event application/json {"type":"claude_done","text":"mon_projet","session":"s1"}'
+verifie "StopFailure (erreur d'API) -> claude_done" \
+  '{"hook_event_name":"StopFailure","session_id":"s1","cwd":"/home/a/Projects/mon_projet"}' \
+  '/event application/json {"type":"claude_done","text":"mon_projet","session":"s1"}'
 verifie "Notification autorisation -> claude_waiting" \
   '{"hook_event_name":"Notification","notification_type":"permission_prompt","session_id":"s1","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_waiting","text":"autorisation ?\nmon_projet","session":"s1"}'
-verifie "Notification attente -> claude_waiting" \
+verifie "Notification idle_prompt (Session qui a fini) -> rien envoyé" \
   '{"hook_event_name":"Notification","notification_type":"idle_prompt","session_id":"s1","cwd":"/x/mon_projet"}' \
-  '/event application/json {"type":"claude_waiting","text":"à toi !\nmon_projet","session":"s1"}'
+  ''
 verifie "Notification d'un autre type -> rien envoyé" \
   '{"hook_event_name":"Notification","notification_type":"auth_success","session_id":"s1","cwd":"/x/mon_projet"}' \
   ''

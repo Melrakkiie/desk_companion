@@ -14,13 +14,14 @@ champ() { printf '%s' "$entree" | jq -r "$1 // empty" 2>/dev/null; }
 
 projet=$(basename "$(champ .cwd)")
 case "$(champ .hook_event_name)" in
-  Stop) type=claude_done; texte=$projet ;;
+  Stop | StopFailure) type=claude_done; texte=$projet ;;  # StopFailure : tour fini sur une erreur d'API
   Notification)
     type=claude_waiting
     case "$(champ .notification_type)" in
       # libellé sur la ligne 1 du Bandeau, projet sur la ligne 2 (saut de ligne dans le texte)
       permission_prompt) texte="autorisation ?"$'\n'"$projet" ;;
-      idle_prompt) texte="à toi !"$'\n'"$projet" ;;
+      # idle_prompt (saisie inactive ~60 s après la fin) ne dit pas que la Session attend quelque chose :
+      # ignoré comme les autres notifications.
       *) exit 0 ;;  # autres notifications : rien à signaler
     esac ;;
   UserPromptSubmit | PostToolUse) type=claude_working; texte=$projet ;;

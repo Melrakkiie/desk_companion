@@ -3,6 +3,9 @@
     "Stop": [
       { "hooks": [ { "type": "command", "command": "$HOME/Projects/esp32/desk_companion/hooks/compagnon-hook.sh" } ] }
     ],
+    "StopFailure": [
+      { "hooks": [ { "type": "command", "command": "$HOME/Projects/esp32/desk_companion/hooks/compagnon-hook.sh" } ] }
+    ],
     "Notification": [
       { "hooks": [ { "type": "command", "command": "$HOME/Projects/esp32/desk_companion/hooks/compagnon-hook.sh" } ] }
     ],
