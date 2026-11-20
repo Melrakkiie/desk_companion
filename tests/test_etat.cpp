@@ -971,12 +971,18 @@ static void test_bouton_claude_compteur_autres_sessions() {
   etatBoutonClaude(false, 1100);
   etatRecevoir(EV_CLAUDE_DONE, "projet-b", 1200, nullptr, "b");
   etatBoutonClaude(true, 2000);
-  assert(strcmp(etatCourant().texte, "projet-b +1") == 0);
+  assert(strcmp(etatCourant().texte, "projet-b   2 sessions") == 0);  // 21 glyphes : compteur au bord droit
   etatBoutonClaude(false, 2100);
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-c", 2200, nullptr, "c");
   etatBoutonClaude(true, 3000);
-  assert(strcmp(etatCourant().texte, "libelle +2") == 0);
+  assert(strcmp(etatCourant().texte, "libelle    3 sessions") == 0);
   assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
+  etatBoutonClaude(false, 3100);
+  etatRecevoir(EV_CLAUDE_END, nullptr, 3200, nullptr, "c");
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 3300, nullptr, "b");
+  etatBoutonClaude(true, 4000);
+  assert(strcmp(etatCourant().texte, "travaille  2 sessions") == 0);  // « travaille » reste à gauche
+  assert(etatLargeurTexte(etatCourant().texte) <= LARGEUR_ECRAN_PX);
 }
 
 static void test_bouton_claude_compteur_ne_deborde_pas_la_ligne() {
@@ -988,12 +994,12 @@ static void test_bouton_claude_compteur_ne_deborde_pas_la_ligne() {
   etatRecevoir(EV_CLAUDE_DONE, "b", 200, nullptr, "b");
   etatBoutonClaude(true, 1000);
   assert(strlen(etatCourant().texte) <= TEXTE_MAX);
-  assert(strcmp(etatCourant().texte, "b +1") == 0);
+  assert(strcmp(etatCourant().texte, "b          2 sessions") == 0);
   etatBoutonClaude(false, 1100);
   etatRecevoir(EV_CLAUDE_DONE, long_, 1200, nullptr, "a");
   etatBoutonClaude(true, 2000);
   assert(strlen(etatCourant().texte) <= TEXTE_MAX);
-  assert(strcmp(etatCourant().texte + strlen(etatCourant().texte) - 3, " +1") == 0);
+  assert(strcmp(etatCourant().texte + strlen(etatCourant().texte) - 11, " 2 sessions") == 0);  // à la suite : défile
 }
 
 static void test_bouton_claude_remplace_rappel_musique_et_inversement() {

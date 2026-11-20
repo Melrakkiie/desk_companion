@@ -410,7 +410,6 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
   if (s == nullptr) { s = laPlusRecente(CLAUDE_FINI); rappel.expression = EXPR_CONTENT; }
   int utilisees = 0;
   for (const Session& t : sessions) if (t.utilisee) utilisees++;
-  int autres = utilisees - 1;  // Sessions autres que celle affichée (-1 si aucune, sans effet)
   if (s == nullptr) {
     rappel.expression = EXPR_SANS_CLAUDE;
     etatVersCp437("pas de Claude", rappel.texte, TEXTE_MAX + 1);
@@ -422,11 +421,16 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     } else {
       lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);
     }
-    static_assert(SESSIONS_MAX <= 10, "« +N » doit tenir sur un chiffre (snprintf de 4 octets)");
-    if (autres > 0 && autres <= 9) {  // « +N » en fin de ligne 1 (borne redondante avec le static_assert, pour gcc), sans dépasser TEXTE_MAX
+    static_assert(SESSIONS_MAX <= 9, "« N sessions » doit tenir sur un chiffre (10 glyphes)");
+    if (utilisees > 1 && utilisees <= 9) {  // borne redondante avec le static_assert, pour gcc
+      // « N sessions » au bord droit de la ligne 1 (bourrage d'espaces) ; trop long : à la suite, et la ligne défile
+      const int COMPTEUR = 10;                                 // strlen("N sessions")
+      const int GLYPHES = LARGEUR_ECRAN_PX / LARGEUR_CHAR_PX;  // ligne pleine sans défilement
       int n = (int)strlen(rappel.texte);
-      if (n > TEXTE_MAX - 3) n = TEXTE_MAX - 3;
-      snprintf(rappel.texte + n, 4, " +%d", autres);
+      if (n > TEXTE_MAX - COMPTEUR - 1) n = TEXTE_MAX - COMPTEUR - 1;
+      int debut = n + 1 + COMPTEUR <= GLYPHES ? GLYPHES - COMPTEUR : n + 1;
+      memset(rappel.texte + n, ' ', debut - n);
+      snprintf(rappel.texte + debut, COMPTEUR + 1, "%d sessions", utilisees);
     }
   }
   rappel.dureeMs = DUREE_RAPPEL_CLAUDE_MS;

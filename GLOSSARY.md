@@ -75,7 +75,7 @@ _À éviter_ : avatar, logo, sprite.
 - `game`, `game_stop`, `claude_working` et `claude_end` ne changent que le point de retour : le changement ne se voit tout de suite que si l'Expression courante est le point de retour ; sinon il attend la fin de l'Expression courante.
 - Un `game` portant un autre nom de jeu met à jour le Bandeau de Jeu sur place.
 - Il n'y a jamais qu'un seul Jeu courant, même si plusieurs jeux tournent.
-- Le Rappel Claude montre, par ordre de priorité, la Session qui attend la plus récente (interpelle), sinon celle qui travaille la plus récente (travaille), sinon celle qui a fini la plus récente (content), sinon Sans Claude. Un « +N » en fin de ligne 1 du Bandeau donne le nombre d'autres Sessions connues ; le projet est en ligne 2.
+- Le Rappel Claude montre, par ordre de priorité, la Session qui attend la plus récente (interpelle), sinon celle qui travaille la plus récente (travaille), sinon celle qui a fini la plus récente (content), sinon Sans Claude. Quand plusieurs Sessions sont connues, « N sessions » au bord droit de la ligne 1 du Bandeau en donne le nombre total ; le projet est en ligne 2.
 - Pendant un Rappel, l'Expression courante continue sa vie : une Expression temporaire peut expirer en dessous, et le Rappel revient alors au point de retour.
 - Un Événement qui change l'Expression met fin au Rappel.
 - Un Son est joué une fois, sans répétition. Seul un autre Son l'interrompt : un Événement sans Son change l'Expression mais laisse le Son finir.
