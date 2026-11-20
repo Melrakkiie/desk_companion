@@ -282,7 +282,7 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
     case EXPR_TRAVAILLE:  dessinerTravaille(e, maintenantMs); break;
     case EXPR_ENDORMI:    dessinerEndormi(e, maintenantMs); break;
     case EXPR_REPOS:
-    default:            dessinerRepos(e, maintenantMs); break;
+    default:             dessinerRepos(e, maintenantMs); break;
   }
 
   ecran.display();

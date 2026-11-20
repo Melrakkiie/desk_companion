@@ -960,6 +960,16 @@ static void test_pas_de_sommeil_sans_wifi() {
   assert(etatCourant().expression == EXPR_REPOS);
 }
 
+static void test_wifi_perdu_pendant_le_sommeil_reveille_sur_repos() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS + 1000, false));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS + 2000, false));  // reste au Repos, pas de Sommeil sans Wi-Fi
+}
+
 static void test_sommeil_2_min_apres_le_retour_du_wifi() {
   etatInit();
   etatMiseAJour(DELAI_SOMMEIL_MS * 3, false);
@@ -1295,6 +1305,7 @@ int main() {
   test_evenements_reveillent_et_s_appliquent();
   test_reveil_sans_son_et_bouton_ne_reveille_pas();
   test_pas_de_sommeil_sans_wifi();
+  test_wifi_perdu_pendant_le_sommeil_reveille_sur_repos();
   test_sommeil_2_min_apres_le_retour_du_wifi();
   puts("Tous les tests passent.");
   return 0;

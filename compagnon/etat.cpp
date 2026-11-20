@@ -23,7 +23,8 @@ static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
 static bool jeuConnu = false;
 static unsigned long nouvellesJeuMs = 0;  // dernier game reçu
 
-// Sommeil : instant du dernier Événement (tout type) ; endormi = point de retour Endormi.
+// Sommeil : instant du dernier Événement (tout type) ; endormi = point de retour Endormi ;
+// wifiPrecedent = état du Wi-Fi à la dernière mise à jour (pour repartir à zéro à son retour).
 static unsigned long dernierEvenementMs = 0;
 static bool endormi = false;
 static bool wifiPrecedent = true;
@@ -384,6 +385,13 @@ bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte) {
   // Sans Wi-Fi le Compagnon n'entend rien : pas de Sommeil, et le compte repart au retour du Wi-Fi.
   if (!wifiConnecte || !wifiPrecedent) dernierEvenementMs = maintenantMs;
   wifiPrecedent = wifiConnecte;
+  if (!wifiConnecte && endormi) {  // le Wi-Fi tombe pendant le Sommeil : réveil sans Son, retour au point de retour
+    endormi = false;
+    if (!etat.temporaire) {
+      retour(maintenantMs);
+      visible = !rappelActif;
+    }
+  }
   if (jeuConnu && maintenantMs - nouvellesJeuMs >= OUBLI_JEU_MS) {  // même effet qu'un game_stop
     if (oublierJeu()) visible = !rappelActif;
   }
@@ -392,11 +400,11 @@ bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte) {
       visible = !rappelActif;
   if (!endormi && maintenantMs - dernierEvenementMs >= DELAI_SOMMEIL_MS) {
     endormi = true;  // avant l'oubli : le retour() d'une Session affichée donne alors Endormi
-    Expression avant = etat.expression;
+    Expression expressionAvantSommeil = etat.expression;
     for (Session& s : sessions)
       if (s.utilisee) oublierSession(s, maintenantMs);
     if (!etat.temporaire && etat.expression != EXPR_ENDORMI) retour(maintenantMs);  // une Expression temporaire finit sa durée
-    if (etat.expression != avant) visible = !rappelActif;
+    if (etat.expression != expressionAvantSommeil) visible = !rappelActif;
   }
   if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
     rappelActif = false;
