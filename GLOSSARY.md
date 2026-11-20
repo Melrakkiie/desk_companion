@@ -52,7 +52,7 @@ _À éviter_ : musique en cours, chanson.
 **Session** : une conversation Claude Code ouverte sur le PC, du premier Événement Claude reçu jusqu'à `claude_end`, ou jusqu'à 12 h sans aucun Événement de sa part (Session fermée sans `claude_end`). Plusieurs Sessions peuvent tourner en parallèle ; le Compagnon en connaît au plus 8 et oublie la plus ancienne quand il en apprend une neuvième.
 _À éviter_ : conversation, instance, onglet.
 
-**État Claude** : ce qu'une Session est en train de faire, d'après son dernier Événement Claude : **attend** (`claude_waiting`), **travaille** (`claude_working`) ou **a fini** (`claude_done`). Il n'expire pas avec le temps (seule la Session entière est oubliée après 12 h sans Événement).
+**État Claude** : ce qu'une Session est en train de faire, d'après son dernier Événement Claude : **attend** (`claude_waiting`), **travaille** (`claude_working`) ou **a fini** (`claude_done`). Une Session attend quand elle est bloquée sur toi : elle demande une autorisation, te pose une question à choix, ou termine sa réponse sur une question qui t'est adressée ; une réponse qui se termine sans rien te demander, c'est « a fini ». Il n'expire pas avec le temps (seule la Session entière est oubliée après 12 h sans Événement).
 
 **Mascotte** : le petit personnage pixel-art de Claude Code (corps carré, deux yeux, deux bras, quatre pattes). Toutes les Expressions Claude (content, interpelle, travaille, Sans Claude) en sont une variation, à la place du visage.
 _À éviter_ : avatar, logo, sprite.
