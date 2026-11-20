@@ -19,19 +19,64 @@ static const int CENTRE_Y = ZONE_VISAGE_Y + ZONE_VISAGE_HAUTEUR / 2;
 
 // Un dessin par Expression : chaque ticket ne remplit que le sien.
 // Tous dessinent dans la Zone visage (y >= 16) ; maintenantMs sert aux animations.
+// Les Expressions Claude montrent la Mascotte Claude ; les autres montrent la Boule.
 
-// Repos : deux yeux ronds et une bouche droite, centrés dans la zone (ticket #6 : clignement)
+// ---- Boule : une petite boule blanche toute ronde, antenne à pompon, traits noirs sur le corps ----
+
+static const int BOULE_X = 64;                     // centre horizontal
+static const int YEUX_Y = 41;                      // hauteur des yeux (sans rebond)
+static const int YEUX_ECART = 8;                   // demi-écart entre les deux yeux
+static const unsigned long REBOND_PERIODE_MS = 250;
+
+// Décalage vertical du rebond : 0 ou -2 px, alterne toutes les REBOND_PERIODE_MS
+static int rebond(unsigned long tempsMs) { return (tempsMs / REBOND_PERIODE_MS) % 2 ? -2 : 0; }
+
+// Corps (y 24..63, ou 22..61 en l'air) et antenne ; le pompon ne monte jamais au-dessus de y = 16
+static void bouleCorps(int dy) {
+  ecran.fillRoundRect(40, 24 + dy, 48, 40, 19, SSD1306_WHITE);
+  ecran.drawFastVLine(BOULE_X, 20 + dy, 4, SSD1306_WHITE);
+  ecran.fillCircle(BOULE_X, 20 + dy, 2, SSD1306_WHITE);
+}
+
+// Yeux ronds noirs avec un reflet ; un trait pendant le clignement. dyYeux : regard vers le haut (< 0)
+static void bouleYeux(int dy, bool fermes, int dyYeux = 0) {
+  for (int s = -1; s <= 1; s += 2) {
+    int x = BOULE_X + s * YEUX_ECART, y = YEUX_Y + dy + dyYeux;
+    if (fermes) {
+      ecran.fillRect(x - 4, y, 9, 2, SSD1306_BLACK);
+    } else {
+      ecran.fillCircle(x, y, 3, SSD1306_BLACK);
+      ecran.drawPixel(x + 1, y - 1, SSD1306_WHITE);
+    }
+  }
+}
+
+// Yeux heureux fermés en « ^ » (épais)
+static void bouleYeuxHeureux(int dy) {
+  for (int s = -1; s <= 1; s += 2) {
+    int x = BOULE_X + s * YEUX_ECART, y = YEUX_Y + dy;
+    for (int d = 0; d < 2; d++) {
+      ecran.drawLine(x - 4, y + 2 + d, x, y - 2 + d, SSD1306_BLACK);
+      ecran.drawLine(x, y - 2 + d, x + 4, y + 2 + d, SSD1306_BLACK);
+    }
+  }
+}
+
+// Petit sourire en « U » : un cercle dont on efface la moitié haute
+static void bouleSourire(int dy) {
+  ecran.drawCircle(BOULE_X, 47 + dy, 3, SSD1306_BLACK);
+  ecran.fillRect(BOULE_X - 4, 44 + dy, 9, 3, SSD1306_WHITE);
+}
+
+static void bouleBoucheTrait(int dy) { ecran.drawFastHLine(BOULE_X - 3, 49 + dy, 7, SSD1306_BLACK); }
+static void bouleBoucheO(int dy) { ecran.fillCircle(BOULE_X, 50 + dy, 2, SSD1306_BLACK); }
+
+// Repos : la Boule sourit et cligne des yeux (ticket #6)
 static void dessinerRepos(const EtatCourant& e, unsigned long maintenantMs) {
   (void)e;
-  if (etatYeuxFermes(maintenantMs)) {
-    // Clignement : yeux réduits à un trait
-    ecran.fillRect(33, CENTRE_Y - 7, 15, 3, SSD1306_WHITE);
-    ecran.fillRect(81, CENTRE_Y - 7, 15, 3, SSD1306_WHITE);
-  } else {
-    ecran.fillCircle(40, CENTRE_Y - 6, 7, SSD1306_WHITE);
-    ecran.fillCircle(88, CENTRE_Y - 6, 7, SSD1306_WHITE);
-  }
-  ecran.drawFastHLine(52, CENTRE_Y + 14, 24, SSD1306_WHITE);
+  bouleCorps(0);
+  bouleYeux(0, etatYeuxFermes(maintenantMs));
+  bouleSourire(0);
 }
 
 // Mascotte Claude (toutes les Expressions Claude) : sprite pixel-art de 16 x 10 cases de M px.
@@ -77,23 +122,17 @@ static void dessinerInterpelle(const EtatCourant& e, unsigned long maintenantMs)
   ecran.fillRect(112, ZONE_VISAGE_Y + 28, 4, 4, SSD1306_WHITE);
 }
 
-// Jeu : yeux du Repos mi-clos sous des sourcils froncés (même clignement que le Repos),
-// bouche serrée, petite manette en bas à droite (à côté du visage, pour ne pas passer pour une bouche)
+// Jeu : la Boule concentrée, yeux mi-clos sous des sourcils froncés (même clignement que
+// le Repos), bouche serrée, petite manette en bas à droite, à côté d'elle
 static void dessinerJeu(const EtatCourant& e, unsigned long maintenantMs) {
   (void)e;
-  if (etatYeuxFermes(maintenantMs)) {
-    ecran.fillRect(33, CENTRE_Y - 7, 15, 3, SSD1306_WHITE);
-    ecran.fillRect(81, CENTRE_Y - 7, 15, 3, SSD1306_WHITE);
-  } else {
-    ecran.fillCircle(40, CENTRE_Y - 6, 7, SSD1306_WHITE);
-    ecran.fillCircle(88, CENTRE_Y - 6, 7, SSD1306_WHITE);
-    ecran.fillRect(32, CENTRE_Y - 13, 64, 5, SSD1306_BLACK);  // paupières : moitié haute masquée
-  }
-  for (int d = 0; d < 2; d++) {  // sourcils froncés, fixes pendant le clignement
-    ecran.drawLine(30, CENTRE_Y - 17 + d, 48, CENTRE_Y - 13 + d, SSD1306_WHITE);
-    ecran.drawLine(98, CENTRE_Y - 17 + d, 80, CENTRE_Y - 13 + d, SSD1306_WHITE);
-  }
-  ecran.drawFastHLine(58, CENTRE_Y + 14, 12, SSD1306_WHITE);
+  bool fermes = etatYeuxFermes(maintenantMs);
+  bouleCorps(0);
+  bouleYeux(0, fermes);
+  if (!fermes) ecran.fillRect(BOULE_X - 12, YEUX_Y - 4, 25, 4, SSD1306_WHITE);  // paupières
+  ecran.drawLine(BOULE_X - 12, YEUX_Y - 7, BOULE_X - 5, YEUX_Y - 5, SSD1306_BLACK);  // sourcils
+  ecran.drawLine(BOULE_X + 12, YEUX_Y - 7, BOULE_X + 5, YEUX_Y - 5, SSD1306_BLACK);
+  bouleBoucheTrait(0);
   // manette : corps arrondi, croix à gauche, deux boutons à droite
   ecran.fillRoundRect(101, CENTRE_Y + 6, 25, 13, 4, SSD1306_WHITE);
   ecran.fillRect(104, CENTRE_Y + 11, 7, 3, SSD1306_BLACK);
@@ -121,20 +160,27 @@ static void dessinerNote(int x, int y) {
   ecran.drawLine(x + 3, y - 12, x + 8, y - 8, SSD1306_WHITE);
 }
 
-// music : visage de Repos entouré de notes qui rebondissent (titre et artiste : voir le Bandeau)
+// music : la Boule, yeux heureux fermés, se dandine entre des notes qui rebondissent
+// (titre et artiste : voir le Bandeau)
 static void dessinerMusique(const EtatCourant& e, unsigned long maintenantMs) {
   unsigned long t = maintenantMs - e.debutMs;
-  dessinerRepos(e, maintenantMs);
-  int rebond = (t / NOTE_REBOND_PERIODE_MS) % 2 ? 3 : 0;
-  dessinerNote(14, CENTRE_Y + 4 - rebond);
-  dessinerNote(112, CENTRE_Y - 6 + rebond);
+  int dy = rebond(t);
+  bouleCorps(dy);
+  bouleYeuxHeureux(dy);
+  bouleSourire(dy);
+  int haut = (t / NOTE_REBOND_PERIODE_MS) % 2 ? 3 : 0;
+  dessinerNote(14, CENTRE_Y + 4 - haut);
+  dessinerNote(112, CENTRE_Y - 6 + haut);
 }
 
-// silence (Rappel sans Morceau courant) : visage de Repos avec une note barrée
+// silence (Rappel sans Morceau courant) : la Boule bouche serrée, une note barrée à côté
 static void dessinerSilence(const EtatCourant& e, unsigned long maintenantMs) {
-  dessinerRepos(e, maintenantMs);
-  dessinerNote(64, CENTRE_Y + 14);
-  ecran.drawLine(50, CENTRE_Y + 18, 78, CENTRE_Y - 8, SSD1306_WHITE);
+  (void)e;
+  bouleCorps(0);
+  bouleYeux(0, etatYeuxFermes(maintenantMs));
+  bouleBoucheTrait(0);
+  dessinerNote(106, CENTRE_Y + 8);
+  ecran.drawLine(97, CENTRE_Y + 12, 119, CENTRE_Y - 8, SSD1306_WHITE);
 }
 
 // Sans Claude (Rappel Claude sans Session connue) : contour vide de la Mascotte, sans yeux ;
@@ -171,16 +217,16 @@ static void dessinerTravaille(const EtatCourant& e, unsigned long maintenantMs) 
   }
 }
 
-// git_push : yeux qui regardent vers le haut (pupilles en haut) et flèche qui monte entre eux
+// git_push : la Boule sautille, regarde en l'air, bouche en « o », une flèche monte à côté
 static void dessinerPush(const EtatCourant& e, unsigned long maintenantMs) {
-  const int yeuxY = CENTRE_Y - 6;
-  for (int x = 40; x <= 88; x += 48) {
-    ecran.drawCircle(x, yeuxY, 9, SSD1306_WHITE);
-    ecran.fillCircle(x, yeuxY - 4, 4, SSD1306_WHITE);
-  }
-  int haut = etatPushFlecheY(maintenantMs - e.debutMs);  // toujours dans la Zone visage
-  ecran.fillTriangle(64, haut, 56, haut + 9, 72, haut + 9, SSD1306_WHITE);
-  ecran.fillRect(61, haut + 9, 7, PUSH_FLECHE_HAUTEUR - 9, SSD1306_WHITE);
+  unsigned long t = maintenantMs - e.debutMs;
+  int dy = rebond(t);
+  bouleCorps(dy);
+  bouleYeux(dy, false, -3);
+  bouleBoucheO(dy);
+  int haut = etatPushFlecheY(t);  // toujours dans la Zone visage
+  ecran.fillTriangle(108, haut, 100, haut + 9, 116, haut + 9, SSD1306_WHITE);
+  ecran.fillRect(105, haut + 9, 7, PUSH_FLECHE_HAUTEUR - 9, SSD1306_WHITE);
 }
 
 void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigned long maintenantMs) {

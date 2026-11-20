@@ -15,9 +15,12 @@ _À éviter_ : écran, mode, humeur.
 **Son** : une courte mélodie jouée par le buzzer du Compagnon en réaction à un Événement. Trois Sons existent : la **fanfare** (victoire, quelques secondes), le **carillon** (deux notes descendantes, « on t'attend ») et la **clochette** (trois notes montantes brèves, « c'est fini »).
 _À éviter_ : bip, alarme, notification.
 
-**Repos** : l'Expression par défaut, quand rien ne se passe, qu'aucune Session n'attend et qu'il n'y a pas de Jeu courant : un visage neutre qui cligne des yeux de temps en temps.
+**Repos** : l'Expression par défaut, quand rien ne se passe, qu'aucune Session n'attend et qu'il n'y a pas de Jeu courant : la Boule qui sourit et cligne des yeux de temps en temps.
 
-**Jeu** : le point de retour tant qu'il y a un Jeu courant et qu'aucune Session n'attend ; elle prend la place du Repos. Visage concentré qui cligne des yeux, une manette dans la Zone visage, le nom du jeu dans le Bandeau.
+**Boule** : la petite mascotte toute ronde du Compagnon (corps rond, antenne à pompon, yeux et bouche en noir sur le corps). Toutes les Expressions qui ne concernent pas Claude (Repos, Jeu, musique, Silence, push) en sont une variation ; les Expressions Claude montrent la Mascotte.
+_À éviter_ : visage, mascotte (réservé à celle de Claude).
+
+**Jeu** : le point de retour tant qu'il y a un Jeu courant et qu'aucune Session n'attend ; elle prend la place du Repos. Boule concentrée qui cligne des yeux, une manette dans la Zone visage, le nom du jeu dans le Bandeau.
 _À éviter_ : gaming, mode jeu.
 
 **Jeu courant** : le jeu lancé sur le PC par Steam ou Lutris, tant qu'il tourne. Le client Steam ou Lutris ouvert sans jeu n'en est pas un. Le PC rappelle l'état toutes les 10 s ; sans nouvelles pendant 30 s, il n'y a plus de Jeu courant.
