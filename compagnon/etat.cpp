@@ -104,6 +104,7 @@ static void demarrerSon(Son son, unsigned long maintenantMs) {
 static const Note* melodie(Son son, int* n) {
   if (son == SON_FANFARE) { *n = sizeof(MELODIE_FANFARE) / sizeof(Note); return MELODIE_FANFARE; }
   if (son == SON_CARILLON) { *n = sizeof(MELODIE_CARILLON) / sizeof(Note); return MELODIE_CARILLON; }
+  if (son == SON_CLOCHETTE) { *n = sizeof(MELODIE_CLOCHETTE) / sizeof(Note); return MELODIE_CLOCHETTE; }
   *n = 0;
   return nullptr;
 }
@@ -232,6 +233,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       Session& s = sessionPour(session, maintenantMs);
       s.etat = CLAUDE_FINI;
       s.changementMs = maintenantMs;
+      demarrerSon(SON_CLOCHETTE, maintenantMs);
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
     }
