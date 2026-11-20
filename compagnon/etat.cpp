@@ -416,7 +416,7 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     rappel.ligne2[0] = '\0';
   } else {
     if (rappel.expression != EXPR_INTERPELLE) {  // le texte d'une Session qui travaille ou a fini est son projet : ligne 2
-      etatVersCp437(rappel.expression == EXPR_TRAVAILLE ? "travaille" : "a fini", rappel.texte, TEXTE_MAX + 1);
+      etatVersCp437(rappel.expression == EXPR_TRAVAILLE ? "Working" : "Done!", rappel.texte, TEXTE_MAX + 1);
       etatVersCp437(s->texte, rappel.ligne2, TEXTE_MAX + 1);
     } else {
       lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);

@@ -20,7 +20,7 @@ case "$(champ .hook_event_name)" in
     type=claude_waiting
     case "$(champ .notification_type)" in
       # libellé sur la ligne 1 du Bandeau, projet sur la ligne 2 (saut de ligne dans le texte)
-      permission_prompt) texte="autorisation ?"$'\n'"$projet" ;;
+      permission_prompt) texte="Hey?"$'\n'"$projet" ;;
       # idle_prompt (saisie inactive ~60 s après la fin) ne dit pas que la Session attend quelque chose :
       # ignoré comme les autres notifications.
       *) exit 0 ;;  # autres notifications : rien à signaler

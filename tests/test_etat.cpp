@@ -958,7 +958,7 @@ static void test_bouton_claude_fini_content_de_la_plus_recente() {
   etatMiseAJour(10000);
   etatBoutonClaude(true, 11000);
   assert(etatCourant().expression == EXPR_CONTENT);
-  assert(strncmp(etatCourant().texte, "a fini", 6) == 0);  // comme « travaille » : le projet en ligne 2
+  assert(strncmp(etatCourant().texte, "Done!", 5) == 0);  // comme « Working » : le projet en ligne 2
   assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
   assert(etatSonCourant() == SON_CLOCHETTE);  // le Son de claude_done, pas du Rappel
   assert(etatFrequence(11000 + etatDureeSon(SON_CLOCHETTE)) == 0);
@@ -968,11 +968,11 @@ static void test_bouton_claude_compteur_autres_sessions() {
   etatInit();
   etatRecevoir(EV_CLAUDE_DONE, "projet-a", 100, nullptr, "a");
   etatBoutonClaude(true, 1000);
-  assert(strcmp(etatCourant().texte, "a fini") == 0);  // une seule : pas de compteur
+  assert(strcmp(etatCourant().texte, "Done!") == 0);  // une seule : pas de compteur
   etatBoutonClaude(false, 1100);
   etatRecevoir(EV_CLAUDE_DONE, "projet-b", 1200, nullptr, "b");
   etatBoutonClaude(true, 2000);
-  assert(strcmp(etatCourant().texte, "a fini   \xB3 2 sessions") == 0);  // 21 glyphes : compteur au bord droit
+  assert(strcmp(etatCourant().texte, "Done!    \xB3 2 sessions") == 0);  // 21 glyphes : compteur au bord droit
   assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
   etatBoutonClaude(false, 2100);
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-c", 2200, nullptr, "c");
@@ -983,7 +983,7 @@ static void test_bouton_claude_compteur_autres_sessions() {
   etatRecevoir(EV_CLAUDE_END, nullptr, 3200, nullptr, "c");
   etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 3300, nullptr, "b");
   etatBoutonClaude(true, 4000);
-  assert(strcmp(etatCourant().texte, "travaille\xB3 2 sessions") == 0);  // « travaille » reste à gauche
+  assert(strcmp(etatCourant().texte, "Working  \xB3 2 sessions") == 0);  // « Working » reste à gauche
   assert(etatLargeurTexte(etatCourant().texte) <= LARGEUR_ECRAN_PX);
 }
 
