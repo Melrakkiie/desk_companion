@@ -34,32 +34,47 @@ static void dessinerRepos(const EtatCourant& e, unsigned long maintenantMs) {
   ecran.drawFastHLine(52, CENTRE_Y + 14, 24, SSD1306_WHITE);
 }
 
-// claude_done : yeux en "^" (épais) et grand sourire
-static void dessinerContent(const EtatCourant& e, unsigned long maintenantMs) {
-  (void)e;
-  (void)maintenantMs;
-  for (int d = 0; d < 2; d++) {
-    ecran.drawLine(32, CENTRE_Y - 2 + d, 40, CENTRE_Y - 10 + d, SSD1306_WHITE);
-    ecran.drawLine(40, CENTRE_Y - 10 + d, 48, CENTRE_Y - 2 + d, SSD1306_WHITE);
-    ecran.drawLine(80, CENTRE_Y - 2 + d, 88, CENTRE_Y - 10 + d, SSD1306_WHITE);
-    ecran.drawLine(88, CENTRE_Y - 10 + d, 96, CENTRE_Y - 2 + d, SSD1306_WHITE);
-  }
-  // Sourire = demi-cercle du bas : on dessine le cercle puis on efface sa moitié haute
-  ecran.drawCircle(64, CENTRE_Y + 4, 13, SSD1306_WHITE);
-  ecran.fillRect(48, CENTRE_Y - 10, 33, 14, SSD1306_BLACK);
+// Mascotte Claude (toutes les Expressions Claude) : sprite pixel-art de 16 x 10 cases de M px.
+// Corps 12 x 8 cases, bras de 2 cases de chaque côté (rangées 4-5), quatre pattes de 2 cases.
+static const int M = 4;
+static const int MASCOTTE_X = 64 - 8 * M;               // centrée horizontalement
+static const int MASCOTTE_Y = ZONE_VISAGE_Y + 4;        // 40 px de haut : de 20 à 59
+static const int OEIL_G = 4, OEIL_D = 11, OEIL_RANGEE = 2;  // colonnes et rangée des yeux
+
+// Une case (ou un bloc de cases) de la Mascotte posée en (x, y)
+static void caseMascotte(int x, int y, int col, int rangee, int largeur, int hauteur, uint16_t couleur) {
+  ecran.fillRect(x + col * M, y + rangee * M, largeur * M, hauteur * M, couleur);
 }
 
-// claude_waiting : grands yeux avec pupilles, sourcils levés, bouche ouverte
+// Silhouette pleine, sans yeux ; brasLeve : bras droit relevé de deux rangées
+static void dessinerMascotte(int x, int y, bool brasLeve) {
+  caseMascotte(x, y, 2, 0, 12, 8, SSD1306_WHITE);
+  caseMascotte(x, y, 0, 4, 2, 2, SSD1306_WHITE);
+  caseMascotte(x, y, 14, brasLeve ? 2 : 4, 2, 2, SSD1306_WHITE);
+  for (int col : {2, 4, 11, 13}) caseMascotte(x, y, col, 8, 1, 2, SSD1306_WHITE);
+}
+
+// claude_done : la Mascotte sautille, yeux en "^" (heureux)
+static void dessinerContent(const EtatCourant& e, unsigned long maintenantMs) {
+  int y = MASCOTTE_Y - (((maintenantMs - e.debutMs) / 300) % 2 ? 3 : 0);  // reste dans la Zone visage
+  dessinerMascotte(MASCOTTE_X, y, false);
+  for (int col : {OEIL_G, OEIL_D}) {
+    int cx = MASCOTTE_X + col * M + M / 2, bas = y + (OEIL_RANGEE + 2) * M - 2;
+    for (int d = 0; d < 2; d++) {
+      ecran.drawLine(cx - 4, bas - d, cx, bas - 4 - d, SSD1306_BLACK);
+      ecran.drawLine(cx, bas - 4 - d, cx + 4, bas - d, SSD1306_BLACK);
+    }
+  }
+}
+
+// claude_waiting : la Mascotte, grands yeux, agite le bras droit ; « ! » à côté
 static void dessinerInterpelle(const EtatCourant& e, unsigned long maintenantMs) {
-  (void)e;
-  (void)maintenantMs;
-  ecran.drawCircle(40, CENTRE_Y - 4, 9, SSD1306_WHITE);
-  ecran.drawCircle(88, CENTRE_Y - 4, 9, SSD1306_WHITE);
-  ecran.fillCircle(40, CENTRE_Y - 4, 4, SSD1306_WHITE);
-  ecran.fillCircle(88, CENTRE_Y - 4, 4, SSD1306_WHITE);
-  ecran.drawLine(30, CENTRE_Y - 17, 50, CENTRE_Y - 20, SSD1306_WHITE);
-  ecran.drawLine(78, CENTRE_Y - 20, 98, CENTRE_Y - 17, SSD1306_WHITE);
-  ecran.drawCircle(64, CENTRE_Y + 15, 5, SSD1306_WHITE);
+  bool brasLeve = ((maintenantMs - e.debutMs) / 300) % 2;
+  dessinerMascotte(MASCOTTE_X, MASCOTTE_Y, brasLeve);
+  caseMascotte(MASCOTTE_X, MASCOTTE_Y, OEIL_G - 1, OEIL_RANGEE, 2, 2, SSD1306_BLACK);
+  caseMascotte(MASCOTTE_X, MASCOTTE_Y, OEIL_D, OEIL_RANGEE, 2, 2, SSD1306_BLACK);
+  ecran.fillRect(112, ZONE_VISAGE_Y + 6, 4, 18, SSD1306_WHITE);
+  ecran.fillRect(112, ZONE_VISAGE_Y + 28, 4, 4, SSD1306_WHITE);
 }
 
 // Jeu : yeux du Repos mi-clos sous des sourcils froncés (même clignement que le Repos),
@@ -122,27 +137,37 @@ static void dessinerSilence(const EtatCourant& e, unsigned long maintenantMs) {
   ecran.drawLine(50, CENTRE_Y + 18, 78, CENTRE_Y - 8, SSD1306_WHITE);
 }
 
-// Sans Claude (Rappel Claude sans Session connue) : visage neutre, le Bandeau dit « pas de Claude »
+// Sans Claude (Rappel Claude sans Session connue) : contour vide de la Mascotte, sans yeux ;
+// le Bandeau dit « pas de Claude »
 static void dessinerSansClaude(const EtatCourant& e, unsigned long maintenantMs) {
-  dessinerRepos(e, maintenantMs);
+  (void)e;
+  (void)maintenantMs;
+  const int x = MASCOTTE_X, y = MASCOTTE_Y;
+  dessinerMascotte(x, y, false);
+  // Évidement : chaque bloc rentré de 1 px en noir ; l'union des évidements ne laisse que le contour
+  ecran.fillRect(x + 2 * M + 1, y + 1, 12 * M - 2, 8 * M - 2, SSD1306_BLACK);
+  ecran.fillRect(x + 1, y + 4 * M + 1, 16 * M - 2, 2 * M - 2, SSD1306_BLACK);
+  for (int col : {2, 4, 11, 13}) ecran.fillRect(x + col * M + 1, y + 8 * M - 1, M - 2, 2 * M, SSD1306_BLACK);
 }
 
-// Travaille (Rappel Claude) : yeux plissés, sourcils froncés, bouche droite, trois points qui tournent
+// Travaille (Rappel Claude) : la Mascotte, yeux plissés (moitié basse), pattes qui trottinent,
+// trois points qui tournent à côté
 static void dessinerTravaille(const EtatCourant& e, unsigned long maintenantMs) {
-  for (int d = 0; d < 2; d++) {  // sourcils froncés
-    ecran.drawLine(30, CENTRE_Y - 17 + d, 48, CENTRE_Y - 12 + d, SSD1306_WHITE);
-    ecran.drawLine(80, CENTRE_Y - 12 + d, 98, CENTRE_Y - 17 + d, SSD1306_WHITE);
-  }
-  ecran.fillRect(33, CENTRE_Y - 8, 15, 4, SSD1306_WHITE);  // yeux plissés
-  ecran.fillRect(81, CENTRE_Y - 8, 15, 4, SSD1306_WHITE);
-  ecran.drawFastHLine(52, CENTRE_Y + 14, 24, SSD1306_WHITE);
-  // Trois points sur un cercle de rayon 6, centré sous les yeux ; un quart de tour par PERIODE_ANIM_MS * 8
-  int quart = ((maintenantMs - e.debutMs) / (PERIODE_ANIM_MS * 8)) % 4;
+  unsigned long t = maintenantMs - e.debutMs;
+  dessinerMascotte(MASCOTTE_X, MASCOTTE_Y, false);
+  caseMascotte(MASCOTTE_X, MASCOTTE_Y, OEIL_G, OEIL_RANGEE + 1, 1, 1, SSD1306_BLACK);
+  caseMascotte(MASCOTTE_X, MASCOTTE_Y, OEIL_D, OEIL_RANGEE + 1, 1, 1, SSD1306_BLACK);
+  // Une patte sur deux levée à tour de rôle : on efface le bas de deux pattes
+  bool pas = (t / 200) % 2;
+  for (int col : {2, 4, 11, 13})
+    if ((col == 2 || col == 11) == pas) caseMascotte(MASCOTTE_X, MASCOTTE_Y, col, 9, 1, 1, SSD1306_BLACK);
+  // Trois points sur un cercle de rayon 6 ; un quart de tour par PERIODE_ANIM_MS * 8
+  int quart = (t / (PERIODE_ANIM_MS * 8)) % 4;
   static const int DX[4] = {6, 0, -6, 0};
   static const int DY[4] = {0, 6, 0, -6};
   for (int i = 0; i < 3; i++) {
     int k = (quart + i) % 4;
-    ecran.fillCircle(64 + DX[k], CENTRE_Y + 4 + DY[k], 1, SSD1306_WHITE);
+    ecran.fillCircle(113 + DX[k], CENTRE_Y + DY[k], 1, SSD1306_WHITE);
   }
 }
 

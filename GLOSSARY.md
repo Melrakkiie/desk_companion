@@ -43,9 +43,12 @@ _À éviter_ : conversation, instance, onglet.
 
 **État Claude** : ce qu'une Session est en train de faire, d'après son dernier Événement Claude : **attend** (`claude_waiting`), **travaille** (`claude_working`) ou **a fini** (`claude_done`). Il n'expire pas avec le temps.
 
-**Travaille** : l'Expression d'une Session qui travaille : visage concentré, points qui tournent dans la Zone visage, projet dans le Bandeau. Elle n'apparaît que dans le Rappel Claude.
+**Mascotte** : le petit personnage pixel-art de Claude Code (corps carré, deux yeux, deux bras, quatre pattes). Toutes les Expressions Claude (content, interpelle, travaille, Sans Claude) en sont une variation, à la place du visage.
+_À éviter_ : avatar, logo, sprite.
 
-**Sans Claude** : l'Expression du Rappel Claude quand aucune Session n'est connue : Bandeau « pas de Claude », visage neutre, temporaire, sans Son.
+**Travaille** : l'Expression d'une Session qui travaille : Mascotte aux yeux plissés qui trottine, points qui tournent à côté, projet dans le Bandeau. Elle n'apparaît que dans le Rappel Claude.
+
+**Sans Claude** : l'Expression du Rappel Claude quand aucune Session n'est connue : Bandeau « pas de Claude », contour vide de la Mascotte, temporaire, sans Son.
 
 ## Types d'Événement
 
