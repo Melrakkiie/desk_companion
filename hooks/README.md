@@ -39,13 +39,14 @@ question qui t'est adressée, sinon `claude_done`. Critères, un seul suffit :
 
 Texte absent ou vide : `claude_done`. Limite : pas d'analyse du sens, donc un `?` final qui ne demande rien
 donne un faux « Hey? » (rare ; l'attente s'efface à ta prochaine saisie).
-Pour `Stop`, `StopFailure` et `claude_end`, le script attend la réponse (au plus 1 s) : envoyé détaché, le
-`claude_done` du `Stop` n'arrivait pas (processus des hooks vraisemblablement tués à la fin du tour). Les autres
-partent détachés, sans attente.
+`Stop`, `StopFailure` et `SessionEnd` envoient en attendant la réponse (au plus 1 s) : détaché, le `claude_done`
+du `Stop` n'arrivait pas (processus des hooks vraisemblablement tués à la fin du tour). Tous les autres
+Événements partent détachés, sans attente.
+
 `claude_waiting` (« Hey? » puis le projet) part aussi dans ces cas : notification `permission_prompt`
 (autorisation), notification `elicitation_dialog` (saisie demandée par un serveur MCP), et `PreToolUse` de
-l'outil `AskUserQuestion` (question à choix). Pour ce dernier, l'entrée `PreToolUse` avec le matcher
-`AskUserQuestion` de `settings-extrait.json` est nécessaire ; tout autre `PreToolUse` est ignoré. L'attente
+l'outil `AskUserQuestion` (question à choix). Pour ce dernier, il faut l'entrée `PreToolUse` avec le matcher
+`AskUserQuestion` de `settings-extrait.json` ; tout autre `PreToolUse` est ignoré. L'attente
 s'efface au `PostToolUse` suivant (`claude_working`), à vérifier en réel : la doc ne confirme pas que
 `PostToolUse` se déclenche après `AskUserQuestion`. `idle_prompt`, « saisie inactive depuis ~60 s », est
 ignorée : elle arrive aussi quand la Session n'attend rien. Limite connue : une interruption (Échap) ne déclenche aucun
