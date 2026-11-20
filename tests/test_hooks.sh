@@ -53,6 +53,9 @@ verifie "UserPromptSubmit -> claude_working" \
 verifie "PostToolUse -> claude_working" \
   '{"hook_event_name":"PostToolUse","session_id":"s1","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_working","text":"mon_projet","session":"s1"}'
+verifie "SessionEnd -> claude_end" \
+  '{"hook_event_name":"SessionEnd","session_id":"s1","reason":"other","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_end","text":"mon_projet","session":"s1"}'
 verifie "Sans session_id -> pas de champ session" \
   '{"hook_event_name":"Stop","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_done","text":"mon_projet"}'

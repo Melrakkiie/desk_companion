@@ -70,7 +70,8 @@ enum TypeEvenement {
   EV_GIT_PUSH,
   EV_MUSIC_STOP,
   EV_GAME,       // texte = nom du jeu
-  EV_GAME_STOP
+  EV_GAME_STOP,
+  EV_CLAUDE_END  // SessionEnd : la Session est oubliée
 };
 
 enum Expression {

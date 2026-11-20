@@ -781,7 +781,93 @@ static void test_sessions_au_dela_de_huit_la_plus_ancienne_est_evincee() {
   assert(etatCourant().expression == EXPR_REPOS);  // s0 évincée : plus rien n'attend
 }
 
+static void test_end_de_la_session_affichee_passe_a_la_suivante_sans_carillon() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 1000, nullptr, "b");
+  unsigned long fin = 1000 + etatDureeSon(SON_CARILLON);
+  assert(etatRecevoir(EV_CLAUDE_END, nullptr, fin, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatFrequence(fin) == 0);  // pas de nouveau carillon
+  assert(etatRecevoir(EV_CLAUDE_END, nullptr, fin + 1, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_end_d_une_session_non_affichee_ne_change_rien_et_l_oublie() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 1000, nullptr, "b");
+  assert(!etatRecevoir(EV_CLAUDE_END, nullptr, 2000, nullptr, "a"));
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  assert(etatRecevoir(EV_CLAUDE_END, nullptr, 3000, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_REPOS);  // A oubliée : plus rien n'attend
+}
+
+static void test_end_d_une_session_inconnue_est_sans_effet() {
+  etatInit();
+  assert(!etatRecevoir(EV_CLAUDE_END, nullptr, 0, nullptr, "inconnue"));
+  assert(etatCourant().expression == EXPR_REPOS);
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 100, nullptr, "a");
+  assert(!etatRecevoir(EV_CLAUDE_END, nullptr, 200, nullptr, "inconnue"));
+  assert(!etatRecevoir(EV_CLAUDE_END, nullptr, 300));  // anonyme inconnue
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_end_ne_consomme_pas_de_place_dans_la_table() {
+  etatInit();
+  char id[8];
+  for (int i = 0; i < 8; i++) {
+    snprintf(id, sizeof id, "s%d", i);
+    etatRecevoir(EV_CLAUDE_WAITING, id, 100 + i, nullptr, id);
+  }
+  for (int i = 0; i < 20; i++) etatRecevoir(EV_CLAUDE_END, nullptr, 500 + i, nullptr, "inconnue");
+  etatRecevoir(EV_CLAUDE_WORKING, nullptr, 900, nullptr, "s7");
+  assert(strcmp(etatCourant().texte, "s6") == 0);
+  for (int i = 6; i >= 0; i--) {  // s0 est toujours là
+    snprintf(id, sizeof id, "s%d", i);
+    assert(strcmp(etatCourant().texte, id) == 0);
+    etatRecevoir(EV_CLAUDE_WORKING, nullptr, 1000 + i, nullptr, id);
+  }
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_end_nomme_reconnu_par_l_api() {
+  TypeEvenement t;
+  assert(etatTypeDepuisNom("claude_end", &t) && t == EV_CLAUDE_END);
+}
+
+static void test_eviction_d_une_neuvieme_session_chasse_la_plus_ancienne_meme_non_affichee() {
+  etatInit();
+  char id[8];
+  for (int i = 0; i < 8; i++) {  // s0 attend, les autres travaillent
+    snprintf(id, sizeof id, "s%d", i);
+    etatRecevoir(i == 0 ? EV_CLAUDE_WAITING : EV_CLAUDE_WORKING, i == 0 ? "A" : "x", 100 + i, nullptr, id);
+  }
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 500, nullptr, "s8");  // neuvième : chasse s0
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "x", 600, nullptr, "s8"));
+  assert(etatCourant().expression == EXPR_REPOS);  // s0 oubliée, pas de retour à "A"
+}
+
+static void test_attente_ne_disparait_pas_avec_le_temps_meme_a_plusieurs() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 10, nullptr, "b");
+  etatMiseAJour(10UL * 24 * 3600 * 1000);
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  etatRecevoir(EV_CLAUDE_END, nullptr, 10UL * 24 * 3600 * 1000 + 1, nullptr, "b");
+  assert(strcmp(etatCourant().texte, "A") == 0);
+}
+
 int main() {
+  test_end_de_la_session_affichee_passe_a_la_suivante_sans_carillon();
+  test_end_d_une_session_non_affichee_ne_change_rien_et_l_oublie();
+  test_end_d_une_session_inconnue_est_sans_effet();
+  test_end_ne_consomme_pas_de_place_dans_la_table();
+  test_end_nomme_reconnu_par_l_api();
+  test_eviction_d_une_neuvieme_session_chasse_la_plus_ancienne_meme_non_affichee();
+  test_attente_ne_disparait_pas_avec_le_temps_meme_a_plusieurs();
   test_sessions_working_d_une_autre_ne_coupe_pas_l_attente();
   test_sessions_done_d_une_autre_content_puis_retour_a_l_attente();
   test_sessions_expression_temporaire_retour_a_l_attente();
