@@ -400,11 +400,11 @@ bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte) {
       visible = !rappelActif;
   if (!endormi && maintenantMs - dernierEvenementMs >= DELAI_SOMMEIL_MS) {
     endormi = true;  // avant l'oubli : le retour() d'une Session affichée donne alors Endormi
-    Expression avant = etat.expression;
+    Expression expressionAvantSommeil = etat.expression;
     for (Session& s : sessions)
       if (s.utilisee) oublierSession(s, maintenantMs);
     if (!etat.temporaire && etat.expression != EXPR_ENDORMI) retour(maintenantMs);  // une Expression temporaire finit sa durée
-    if (etat.expression != avant) visible = !rappelActif;
+    if (etat.expression != expressionAvantSommeil) visible = !rappelActif;
   }
   if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
     rappelActif = false;
