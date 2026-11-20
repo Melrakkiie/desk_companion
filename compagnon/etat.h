@@ -44,6 +44,10 @@ const Note MELODIE_FANFARE[] = {
 const Note MELODIE_CARILLON[] = {
   {988, 150}, {0, 30}, {784, 250},
 };
+// Clochette (claude_done) : trois notes montantes Mi-Sol-Do aigu, < 0,5 s (le carillon descend).
+const Note MELODIE_CLOCHETTE[] = {
+  {1319, 100}, {1568, 100}, {2093, 150},
+};
 
 // Géométrie de l'écran mesurée sur le matériel (ticket #3) : la bande jaune du haut est le Bandeau.
 const int BANDEAU_HAUTEUR = 16;     // Bandeau = lignes 0 à 15
@@ -96,7 +100,7 @@ void etatVersCp437(const char* utf8, char* sortie, int taille);
 // Traduit le nom d'un type ("claude_done"...) ; faux si le type est inconnu.
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type);
 
-enum Son { SON_AUCUN, SON_FANFARE, SON_CARILLON };
+enum Son { SON_AUCUN, SON_FANFARE, SON_CARILLON, SON_CLOCHETTE };
 
 // Durée totale d'un Son (ms) ; 0 pour SON_AUCUN.
 unsigned long etatDureeSon(Son son);
@@ -104,7 +108,7 @@ unsigned long etatDureeSon(Son son);
 // Fréquence (Hz) à jouer pour ce Son après tempsEcouleMs ; 0 = silence ou Son terminé.
 unsigned int etatFrequenceSon(Son son, unsigned long tempsEcouleMs);
 
-// Son en cours (ou terminé : seule la fréquence 0 le dit) ; démarré par claude_waiting et git_push,
+// Son en cours (ou terminé : seule la fréquence 0 le dit) ; démarré par claude_done, claude_waiting et git_push,
 // jamais interrompu par les autres Événements.
 Son etatSonCourant();
 
