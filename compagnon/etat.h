@@ -115,10 +115,17 @@ unsigned int etatFrequence(unsigned long maintenantMs);
 // instant ; un Bouton déjà tenu ne montre pas de Rappel (il faut le relâcher puis le renfoncer).
 void etatInit(bool boutonEnfonceAuDemarrage = false);
 
-// Applique un Événement (le dernier gagne). Renvoie vrai si l'Expression a changé.
-// texte et artiste peuvent être nullptr.
+// État Claude d'une Session (voir GLOSSARY.md).
+enum EtatClaude { CLAUDE_ATTEND, CLAUDE_TRAVAILLE, CLAUDE_FINI };
+
+const int SESSIONS_MAX = 8;       // taille de la table des Sessions ; la plus ancienne cède la place
+const int SESSION_ID_MAX = 40;    // longueur conservée de l'identifiant (le reste est tronqué)
+
+// Applique un Événement. Renvoie vrai si l'Expression a changé.
+// texte, artiste et session peuvent être nullptr ; session = identifiant de la Session Claude Code
+// (claude_*), nullptr = Session anonyme unique. Seuls les Événements de la même Session changent son État Claude.
 bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
-                  const char* artiste = nullptr);
+                  const char* artiste = nullptr, const char* session = nullptr);
 
 // À appeler à chaque tour de loop() : renvoie vrai si l'Expression a changé (retour au Repos).
 bool etatMiseAJour(unsigned long maintenantMs);

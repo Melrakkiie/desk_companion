@@ -58,10 +58,13 @@ static void traiterEvenement() {
     repondre(400, "artist doit être une chaîne");
     return;
   }
-
+  if (!doc["session"].isNull() && !doc["session"].is<const char*>()) {
+    repondre(400, "session doit être une chaîne");
+    return;
+  }
   // Le texte et l'artiste trop longs sont tronqués par le module État.
   if (etatRecevoir(type, doc["text"] | (const char*)nullptr, millis(),
-                   doc["artist"] | (const char*)nullptr)) {
+                   doc["artist"] | (const char*)nullptr, doc["session"] | (const char*)nullptr)) {
     expressionChangee = true;
   }
   Serial.printf("API : événement %s \"%s\"\n", doc["type"].as<const char*>(),

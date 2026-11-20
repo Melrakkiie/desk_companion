@@ -633,7 +633,136 @@ static void test_rappel_evenement_qui_change_y_met_fin_working_sans_effet_non() 
   assert(etatSonCourant() == SON_FANFARE);
 }
 
+// Sessions : l'identifiant (5e argument) sépare les attentes ; nullptr = Session anonyme.
+static void test_sessions_working_d_une_autre_ne_coupe_pas_l_attente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "B", 100, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(!etatMiseAJour(60000));  // pas de délai d'attente
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_sessions_done_d_une_autre_content_puis_retour_a_l_attente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  assert(etatRecevoir(EV_CLAUDE_DONE, "B", 1000, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  assert(etatMiseAJour(1000 + DUREE_CLAUDE_DONE_MS));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "A") == 0);
+}
+
+static void test_sessions_expression_temporaire_retour_a_l_attente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_GIT_PUSH, "main", 1000);
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(etatMiseAJour(1000 + DUREE_GIT_PUSH_MS));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  etatRecevoir(EV_MUSIC, "Titre", 5000, "Artiste");
+  assert(etatMiseAJour(5000 + etatCourant().dureeMs));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_sessions_interpelle_l_emporte_sur_le_jeu() {
+  etatInit();
+  etatRecevoir(EV_GAME, "Jeu", 0);
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "A", 1000, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(!etatRecevoir(EV_GAME, "Autre", 2000));
+  assert(!etatRecevoir(EV_GAME_STOP, nullptr, 2500));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  etatRecevoir(EV_GAME, "Jeu", 3000);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "A", 4000, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_JEU);  // Jeu connu à nouveau
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 5000, nullptr, "a");
+  etatRecevoir(EV_GAME_STOP, nullptr, 5500);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "A", 6000, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sessions_la_plus_recente_puis_la_precedente_sans_carillon() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 1000, nullptr, "b");
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  unsigned long fin = 1000 + etatDureeSon(SON_CARILLON);
+  assert(etatFrequence(fin) == 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "B", fin, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatFrequence(fin) == 0);  // pas de nouveau carillon
+  assert(etatSonCourant() == SON_CARILLON);
+  assert(etatRecevoir(EV_CLAUDE_DONE, "A", fin + 1, nullptr, "a"));
+  assert(etatMiseAJour(fin + 1 + DUREE_CLAUDE_DONE_MS));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sessions_seuls_working_et_done_de_la_meme_session_terminent_l_attente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "x", 10, nullptr, "inconnue"));
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "x", 20));  // anonyme != "a"
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "x", 30, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sessions_anonyme_comme_avant_et_distincte_des_nommees() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "anon", 0);
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 100, nullptr, "a");
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 200, nullptr, "a"));
+  assert(strcmp(etatCourant().texte, "anon") == 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 300));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sessions_rappel_pendant_attente_de_deux_sessions() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 100, nullptr, "b");
+  etatBouton(true, 1000);
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 1500, nullptr, "inconnue"));  // sans effet : le Rappel continue
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatMiseAJour(4000));
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  etatBouton(false, 4100);
+  etatBouton(true, 5000);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 5500, nullptr, "b"));  // change l'Expression : fin du Rappel
+  assert(strcmp(etatCourant().texte, "A") == 0);
+}
+
+static void test_sessions_au_dela_de_huit_la_plus_ancienne_est_evincee() {
+  etatInit();
+  char id[8];
+  for (int i = 0; i < 9; i++) {
+    snprintf(id, sizeof id, "s%d", i);
+    etatRecevoir(EV_CLAUDE_WAITING, id, 100 + i, nullptr, id);
+  }
+  assert(strcmp(etatCourant().texte, "s8") == 0);
+  for (int i = 8; i >= 1; i--) {
+    snprintf(id, sizeof id, "s%d", i);
+    assert(strcmp(etatCourant().texte, id) == 0);
+    etatRecevoir(EV_CLAUDE_WORKING, nullptr, 1000 + i, nullptr, id);
+  }
+  assert(etatCourant().expression == EXPR_REPOS);  // s0 évincée : plus rien n'attend
+}
+
 int main() {
+  test_sessions_working_d_une_autre_ne_coupe_pas_l_attente();
+  test_sessions_done_d_une_autre_content_puis_retour_a_l_attente();
+  test_sessions_expression_temporaire_retour_a_l_attente();
+  test_sessions_interpelle_l_emporte_sur_le_jeu();
+  test_sessions_la_plus_recente_puis_la_precedente_sans_carillon();
+  test_sessions_seuls_working_et_done_de_la_meme_session_terminent_l_attente();
+  test_sessions_anonyme_comme_avant_et_distincte_des_nommees();
+  test_sessions_rappel_pendant_attente_de_deux_sessions();
+  test_sessions_au_dela_de_huit_la_plus_ancienne_est_evincee();
   test_son_fanfare_au_push_et_carillon_au_waiting();
   test_son_evenements_silencieux_ne_touchent_pas_au_son();
   test_son_nouveau_son_remplace_et_repart_du_debut();

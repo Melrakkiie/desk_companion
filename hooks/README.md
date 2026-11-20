@@ -24,6 +24,8 @@ curl -X POST -H 'Content-Type: application/json' -d '{"type":"music","text":"Tit
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"git_push","text":"main"}' http://compagnon.local/event
 ```
 
+Les Événements Claude portent le `session_id` du hook dans `session` (chaîne, facultatif : absent = Session anonyme) ; le Compagnon suit l'attente de chaque Session séparément.
+
 Le `text` s'affiche sur deux lignes du Bandeau au plus : coupé au premier `\n` (ligne 2 = le reste).
 Chaque ligne est tronquée à 100 caractères et défile si elle dépasse l'écran.
 
