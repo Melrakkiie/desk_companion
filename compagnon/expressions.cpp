@@ -212,7 +212,7 @@ static void dessinerVideo(const EtatCourant& e, unsigned long maintenantMs) {
   ecran.fillTriangle(104, 31, 104, 43, 114, 37, SSD1306_WHITE);
 }
 
-// silence (Rappel sans Morceau courant) : la Boule bouche serrée, une note barrée à côté
+// silence (Rappel sans Morceau ni Vidéo courante) : la Boule bouche serrée, une note barrée à côté
 static void dessinerSilence(const EtatCourant& e, unsigned long maintenantMs) {
   (void)e;
   bouleCorps(0);
