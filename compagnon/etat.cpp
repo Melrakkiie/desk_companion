@@ -1,4 +1,5 @@
 #include "etat.h"
+#include <stdio.h>
 #include <string.h>
 
 static EtatCourant etat;  // l'Expression courante, que le Rappel recouvre sans la toucher
@@ -61,18 +62,35 @@ static Session* sessionConnue(const char* id) {
   return nullptr;
 }
 
-// Session qui attend depuis le plus récent changement, ou nullptr. Égalité d'instant : la dernière de la table.
-static const Session* attenteLaPlusRecente() {
+// Session dans cet État Claude depuis le plus récent changement, ou nullptr. Égalité d'instant : la dernière de la table.
+static const Session* laPlusRecente(EtatClaude etat) {
   const Session* res = nullptr;
   for (const Session& s : sessions)
-    if (s.utilisee && s.etat == CLAUDE_ATTEND && (res == nullptr || s.changementMs >= res->changementMs)) res = &s;
+    if (s.utilisee && s.etat == etat && (res == nullptr || s.changementMs >= res->changementMs)) res = &s;
   return res;
 }
 
-// Anti-rebond du Bouton
-static bool boutonEnfonce = false;
-static bool boutonChangement = false;  // un changement accepté a déjà eu lieu
-static unsigned long boutonChangementMs = 0;
+static const Session* attenteLaPlusRecente() {
+  return laPlusRecente(CLAUDE_ATTEND);
+}
+
+// Anti-rebond d'un Bouton : niveau accepté et instant du dernier changement accepté.
+struct Bouton {
+  bool enfonce;
+  bool changement;  // un changement accepté a déjà eu lieu
+  unsigned long changementMs;
+};
+static Bouton boutonMusique, boutonClaude;
+
+// Vrai sur un front d'appui accepté (anti-rebond passé) ; un relâchement ou un niveau inchangé renvoie faux.
+static bool frontAppui(Bouton& b, bool enfonce, unsigned long maintenantMs) {
+  if (enfonce == b.enfonce) return false;
+  if (b.changement && maintenantMs - b.changementMs < ANTI_REBOND_MS) return false;
+  b.enfonce = enfonce;
+  b.changement = true;
+  b.changementMs = maintenantMs;
+  return enfonce;
+}
 
 // Lettres non ASCII disponibles en CP437 : {point de code Unicode, octet CP437}.
 static const struct { unsigned int unicode; unsigned char cp437; } TABLE_CP437[] = {
@@ -188,7 +206,7 @@ static bool oublierJeu() {
   return true;
 }
 
-void etatInit(bool boutonEnfonceAuDemarrage) {
+void etatInit(bool boutonMusiqueEnfonceAuDemarrage, bool boutonClaudeEnfonceAuDemarrage) {
   repos();
   sonCourant = SON_AUCUN;
   rappelActif = false;
@@ -196,8 +214,9 @@ void etatInit(bool boutonEnfonceAuDemarrage) {
   morceauEnPause = false;
   jeuConnu = false;
   memset(sessions, 0, sizeof(sessions));
-  boutonEnfonce =boutonEnfonceAuDemarrage;  // tenu au démarrage : pas de front d'appui
-  boutonChangement = false;
+  // tenu au démarrage : pas de front d'appui
+  boutonMusique = {boutonMusiqueEnfonceAuDemarrage, false, 0};
+  boutonClaude = {boutonClaudeEnfonceAuDemarrage, false, 0};
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
@@ -241,6 +260,8 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       Session& s = sessionPour(session, maintenantMs);
       s.etat = CLAUDE_FINI;
       s.changementMs = maintenantMs;
+      strncpy(s.texte, texte == nullptr ? "" : texte, sizeof(s.texte) - 1);  // pour le Rappel Claude
+      s.texte[sizeof(s.texte) - 1] = '\0';
       demarrerSon(SON_CLOCHETTE, maintenantMs);
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
@@ -353,12 +374,7 @@ bool etatMiseAJour(unsigned long maintenantMs) {
 }
 
 bool etatBouton(bool enfonce, unsigned long maintenantMs) {
-  if (enfonce == boutonEnfonce) return false;
-  if (boutonChangement && maintenantMs - boutonChangementMs < ANTI_REBOND_MS) return false;
-  boutonEnfonce = enfonce;
-  boutonChangement = true;
-  boutonChangementMs = maintenantMs;
-  if (!enfonce) return false;
+  if (!frontAppui(boutonMusique, enfonce, maintenantMs)) return false;
 
   oublierSiPerime(maintenantMs);
   if (morceauConnu && !morceauEnPause) {
@@ -369,6 +385,35 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
     rappel.ligne2[0] = '\0';
     rappel.dureeMs = DUREE_SILENCE_MS;
   }
+  rappel.temporaire = true;
+  rappel.debutMs = maintenantMs;
+  rappelActif = true;
+  return true;
+}
+
+// Rappel Claude : l'État Claude le plus urgent. Priorité : attend > a fini > Sans Claude
+// (le ticket suivant insère « travaille » entre les deux premiers).
+bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
+  if (!frontAppui(boutonClaude, enfonce, maintenantMs)) return false;
+
+  const Session* s = attenteLaPlusRecente();
+  rappel.expression = EXPR_INTERPELLE;
+  if (s == nullptr) { s = laPlusRecente(CLAUDE_FINI); rappel.expression = EXPR_CONTENT; }
+  int autres = -1;
+  for (const Session& t : sessions) autres += t.utilisee;
+  if (s == nullptr) {
+    rappel.expression = EXPR_SANS_CLAUDE;
+    etatVersCp437("pas de Claude", rappel.texte, TEXTE_MAX + 1);
+    rappel.ligne2[0] = '\0';
+  } else {
+    lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);
+    if (autres > 0) {  // « +N » en fin de ligne 1 (N <= SESSIONS_MAX - 1 : un chiffre), sans dépasser TEXTE_MAX
+      int n = (int)strlen(rappel.texte);
+      if (n > TEXTE_MAX - 3) n = TEXTE_MAX - 3;
+      snprintf(rappel.texte + n, 4, " +%d", autres);
+    }
+  }
+  rappel.dureeMs = DUREE_RAPPEL_CLAUDE_MS;
   rappel.temporaire = true;
   rappel.debutMs = maintenantMs;
   rappelActif = true;

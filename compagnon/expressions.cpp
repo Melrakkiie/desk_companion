@@ -122,6 +122,11 @@ static void dessinerSilence(const EtatCourant& e, unsigned long maintenantMs) {
   ecran.drawLine(50, CENTRE_Y + 18, 78, CENTRE_Y - 8, SSD1306_WHITE);
 }
 
+// Sans Claude (Rappel Claude sans Session connue) : visage neutre, le Bandeau dit « pas de Claude »
+static void dessinerSansClaude(const EtatCourant& e, unsigned long maintenantMs) {
+  dessinerRepos(e, maintenantMs);
+}
+
 // git_push : yeux qui regardent vers le haut (pupilles en haut) et flèche qui monte entre eux
 static void dessinerPush(const EtatCourant& e, unsigned long maintenantMs) {
   const int yeuxY = CENTRE_Y - 6;
@@ -155,8 +160,9 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
     case EXPR_PUSH:       dessinerPush(e, maintenantMs); break;
     case EXPR_JEU:        dessinerJeu(e, maintenantMs); break;
     case EXPR_SILENCE:    dessinerSilence(e, maintenantMs); break;
+    case EXPR_SANS_CLAUDE: dessinerSansClaude(e, maintenantMs); break;
     case EXPR_REPOS:
-    default:              dessinerRepos(e, maintenantMs); break;
+    default:             dessinerRepos(e, maintenantMs); break;
   }
 
   ecran.display();
