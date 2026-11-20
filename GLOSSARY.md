@@ -55,7 +55,7 @@ _À éviter_ : film, vidéo en cours.
 **Session** : une conversation Claude Code ouverte sur le PC, du premier Événement Claude reçu jusqu'à `claude_end`, ou jusqu'à 12 h sans aucun Événement de sa part (Session fermée sans `claude_end`). Plusieurs Sessions peuvent tourner en parallèle ; le Compagnon en connaît au plus 8 et oublie la plus ancienne quand il en apprend une neuvième.
 _À éviter_ : conversation, instance, onglet.
 
-**État Claude** : ce qu'une Session est en train de faire, d'après son dernier Événement Claude : **attend** (`claude_waiting`), **travaille** (`claude_working`) ou **a fini** (`claude_done`). Une Session attend quand elle est bloquée sur toi : elle demande une autorisation, te pose une question à choix, ou termine sa réponse sur une question qui t'est adressée ; une réponse qui se termine sans rien te demander, c'est « a fini ». Il n'expire pas avec le temps (seule la Session entière est oubliée après 12 h sans Événement).
+**État Claude** : ce qu'une Session est en train de faire, d'après son dernier Événement Claude : **attend** (`claude_waiting`), **travaille** (`claude_working`) ou **a fini** (`claude_done`). Une Session attend quand elle est bloquée sur toi : elle demande une autorisation, te pose une question à choix, ou termine sa réponse sur une question qui t'est adressée ; une réponse qui se termine sans rien te demander, c'est « a fini », à condition que plus rien ne tourne en arrière-plan pour elle (sous-agent, commande de fond). Une réponse qui se termine sans question alors que du travail en arrière-plan tourne encore laisse la Session **travaille**, sans Son : elle reprendra d'elle-même. Les tâches planifiées (boucles, rappels) ne comptent pas comme travail en arrière-plan. Il n'expire pas avec le temps (seule la Session entière est oubliée après 12 h sans Événement).
 
 **Mascotte** : le petit personnage pixel-art de Claude Code (corps carré, deux yeux, deux bras, quatre pattes). Toutes les Expressions Claude (content, interpelle, travaille, Sans Claude) en sont une variation, à la place du visage.
 _À éviter_ : avatar, logo, sprite.
@@ -68,7 +68,7 @@ _À éviter_ : avatar, logo, sprite.
 
 | Type | Ce qui s'est passé | Expression | Son |
 |---|---|---|---|
-| `claude_done` | Une Session a fini de répondre | content (« Done! », projet en ligne 2), temporaire | clochette |
+| `claude_done` | Une Session a fini sa tâche : sa réponse est terminée et plus rien ne tourne en arrière-plan pour elle | content (« Done! », projet en ligne 2), temporaire | clochette |
 | `claude_waiting` | Une Session attend une réponse ou une autorisation | interpelle, qui reste le point de retour tant que la Session attend | carillon |
 | `claude_working` | On a répondu à une Session, elle reprend son travail | aucune ; si cette Session attendait, interpelle passe à la Session suivante qui attend, sinon s'en va | — |
 | `claude_end` | Une Session s'est fermée | aucune : la Session est oubliée (comme `claude_working` si elle attendait) | — |
