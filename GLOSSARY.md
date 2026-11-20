@@ -38,10 +38,10 @@ _À éviter_ : partie, jeu en cours.
 
 **Expression temporaire** : une Expression qui revient d'elle-même au point de retour après une durée propre à son type.
 
-**Bouton** : un des deux boutons physiques du Compagnon, le **Bouton musique** ou le **Bouton Claude**. Un appui montre un Rappel. Un appui n'est pas un Événement : il ne vient pas du PC.
+**Bouton** : un des deux boutons physiques du Compagnon, le **Bouton musique** ou le **Bouton Claude**. Un appui montre un Rappel, sauf l'appui sur le Bouton Claude pendant interpelle : il chasse la Session affichée (elle passe à « a fini », avec son projet seul, et le Compagnon revient au point de retour, sans Rappel ni Son). Un appui n'est pas un Événement : il ne vient pas du PC.
 _À éviter_ : touche, interrupteur.
 
-**Rappel** : ce que montre un appui sur un Bouton, par-dessus l'Expression courante sans la remplacer, pendant une durée propre à son type et sans Son. Le **Rappel musique** (Bouton musique) montre l'Expression musique du Morceau courant, ou Silence s'il n'y en a pas (Endormi pendant le Sommeil). Le **Rappel Claude** (Bouton Claude) montre l'État Claude le plus urgent. À la fin du Rappel, le Compagnon revient à l'Expression courante. Un nouvel appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
+**Rappel** : ce que montre un appui sur un Bouton (sauf le Bouton Claude pendant interpelle), par-dessus l'Expression courante sans la remplacer, pendant une durée propre à son type et sans Son. Le **Rappel musique** (Bouton musique) montre l'Expression musique du Morceau courant, ou Silence s'il n'y en a pas (Endormi pendant le Sommeil). Le **Rappel Claude** (Bouton Claude) montre l'État Claude le plus urgent. À la fin du Rappel, le Compagnon revient à l'Expression courante. Un nouvel appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
 _À éviter_ : popup, superposition, aperçu.
 
 **Morceau courant** : le dernier morceau annoncé par `music`, tant que la lecture n'a pas été mise en pause ou arrêtée (`music_stop`). Il n'y en a pas toujours. Un morceau mis en pause reste connu du Compagnon : s'il reprend, il redevient Morceau courant sans être réaffiché. Le PC rappelle l'état de lecture toutes les 10 s ; sans nouvelles pendant 30 s, il n'y a plus de Morceau courant.
@@ -84,6 +84,7 @@ _À éviter_ : avatar, logo, sprite.
 - Un `game` portant un autre nom de jeu met à jour le Bandeau de Jeu sur place.
 - Il n'y a jamais qu'un seul Jeu courant, même si plusieurs jeux tournent.
 - Le Rappel Claude montre, par ordre de priorité, la Session qui attend la plus récente (interpelle), sinon celle qui travaille la plus récente (travaille), sinon celle qui a fini la plus récente (content), sinon Sans Claude. La ligne 1 du Bandeau dit l'état (« Working », « Done! » ou le libellé d'attente, « Hey? ») ; le projet est en ligne 2. Quand plusieurs Sessions sont connues, « │ N sessions » au bord droit de la ligne 1 en donne le nombre total.
+- La décision se prend sur l'Expression courante : si elle est interpelle (même sous un Rappel, qui prend fin), l'appui sur le Bouton Claude ne montre pas de Rappel, il chasse la Session affichée. Elle reste suivie et compte dans « N sessions » ; si l'Expression courante n'est pas interpelle (content d'une autre Session par-dessus l'attente, par exemple), l'appui montre le Rappel.
 - Pendant un Rappel, l'Expression courante continue sa vie : une Expression temporaire peut expirer en dessous, et le Rappel revient alors au point de retour.
 - Un Événement qui change l'Expression met fin au Rappel.
 - Un Son est joué une fois, sans répétition. Seul un autre Son l'interrompt : un Événement sans Son change l'Expression mais laisse le Son finir.

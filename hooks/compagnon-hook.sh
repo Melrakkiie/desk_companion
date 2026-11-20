@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Hook Claude Code -> Compagnon. Lit le JSON du hook sur l'entrée, envoie l'Événement
-# correspondant en POST /event, sans jamais échouer ; au plus 1 s d'attente (fin de tour), sinon aucune.
+# correspondant en POST /event, sans jamais échouer ; attente de la réponse : au plus 3 s (Stop, StopFailure), 1 s
+# (les autres, dont PostToolUse AskUserQuestion) ; seul le PostToolUse ordinaire est détaché, sans attente.
 #
 # Cible : http://compagnon.local, remplaçable par la variable COMPAGNON_URL (tests).
 # Le session_id du hook part dans le champ "session" : le Compagnon suit chaque Session
@@ -8,7 +9,8 @@
 
 # Durée du hook, laissée ici (couche hook) plutôt que dans etat.h : voir le bloc de durées d'etat.h.
 delai_curl_s=2  # envoi détaché : abandonne la requête après 2 s (le script, lui, rend la main tout de suite)
-delai_fin_s=1   # fin de tour ou de Session : le script attend la réponse, au plus 1 s
+delai_fin_s=1   # envoi qui attend la réponse, au plus 1 s (aussi SessionEnd : budget 1,5 s)
+delai_tour_s=3  # fin de tour (Stop, StopFailure) : le Compagnon répond lentement (0,4 s), 1 s ne suffisait pas
 
 entree=$(cat)
 champ() { printf '%s' "$entree" | jq -r "$1 // empty" 2>/dev/null; }
@@ -30,12 +32,14 @@ finit_sur_question() {
     END { if (p != "") d = p; exit !(d ~ /\?[[:space:]]*$/) }'
 }
 
-attendre=0  # 1 : envoi qui attend la réponse (fin de tour ou de Session)
+# Durée d'attente de la réponse en s ; 0 : envoi détaché. Par défaut le script attend : un envoi détaché
+# se perd (Claude Code tue vraisemblablement les processus du hook à sa sortie, le Compagnon est lent).
+duree_attente_s=$delai_fin_s
 case "$(champ .hook_event_name)" in
   Stop)
-    attendre=1
+    duree_attente_s=$delai_tour_s
     if finit_sur_question; then type=claude_waiting; texte=$hey; else type=claude_done; texte=$projet; fi ;;
-  StopFailure) attendre=1; type=claude_done; texte=$projet ;;  # tour fini sur une erreur d'API : aucune question
+  StopFailure) duree_attente_s=$delai_tour_s; type=claude_done; texte=$projet ;;  # tour fini sur une erreur d'API : aucune question
   Notification)
     type=claude_waiting
     case "$(champ .notification_type)" in
@@ -49,8 +53,11 @@ case "$(champ .hook_event_name)" in
   PreToolUse)  # question à choix ouverte : la Session attend ; PostToolUse efface l'attente
     [ "$(champ .tool_name)" = AskUserQuestion ] || exit 0
     type=claude_waiting; texte=$hey ;;
-  UserPromptSubmit | PostToolUse) type=claude_working; texte=$projet ;;
-  SessionEnd) attendre=1; type=claude_end; texte=$projet ;;  # la Session fermée n'est plus suivie
+  UserPromptSubmit) type=claude_working; texte=$projet ;;
+  PostToolUse)  # dizaines par minute : détaché, sauf après une question à choix (efface le Hey?)
+    type=claude_working; texte=$projet
+    [ "$(champ .tool_name)" = AskUserQuestion ] || duree_attente_s=0 ;;
+  SessionEnd) type=claude_end; texte=$projet ;;  # la Session fermée n'est plus suivie
   *) exit 0 ;;
 esac
 
@@ -63,8 +70,5 @@ envoyer() {
     -d "$corps" "${COMPAGNON_URL:-http://compagnon.local}/event" >/dev/null 2>&1
 }
 
-# Fin de tour ou de Session : envoyé détaché, le claude_done du Stop n'arrivait pas (processus
-# des hooks vraisemblablement tués à la fin du tour). On attend la réponse, au plus 1 s
-# (budget SessionEnd : 1,5 s). Le reste (dizaines de PostToolUse par minute) part détaché.
-if [ "$attendre" = 1 ]; then envoyer "$delai_fin_s"; else ( envoyer "$delai_curl_s" & ) >/dev/null 2>&1; fi
+if [ "$duree_attente_s" != 0 ]; then envoyer "$duree_attente_s"; else ( envoyer "$delai_curl_s" & ) >/dev/null 2>&1; fi
 exit 0

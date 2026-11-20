@@ -152,9 +152,12 @@ bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte = true);
 // Renvoie vrai si l'affichage change.
 bool etatBouton(bool enfonce, unsigned long maintenantMs);
 
-// Bouton Claude (D26), mêmes règles que etatBouton, anti-rebond propre. L'appui montre le Rappel
-// Claude (3 s, sans Son) : l'État Claude le plus urgent (attend > travaille > a fini > Sans Claude), « │ N sessions » au bord droit de la ligne 1 s'il y en a plusieurs
-// Sessions connues. Le dernier appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
+// Bouton Claude (D26), mêmes règles que etatBouton, anti-rebond propre. Si l'Expression courante est
+// interpelle (même sous un Rappel), l'appui chasse la Session affichée : elle passe à « a fini »
+// (projet seul), fin du Rappel, retour au point de retour, sans Rappel ni Son. Sinon l'appui montre
+// le Rappel Claude (3 s, sans Son) : l'État Claude le plus urgent (attend > travaille > a fini >
+// Sans Claude), « │ N sessions » au bord droit de la ligne 1 s'il y a plusieurs Sessions connues.
+// Le dernier appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
 bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs);
 
 // Expression à afficher : le Rappel s'il y en a un, sinon l'Expression courante.

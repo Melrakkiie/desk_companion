@@ -77,15 +77,26 @@ static void majSession(Session& s, EtatClaude etat, const char* texte, unsigned 
 }
 
 // Session dans cet État Claude depuis le plus récent changement, ou nullptr. Égalité d'instant : la dernière de la table.
-static const Session* laPlusRecente(EtatClaude etat) {
-  const Session* res = nullptr;
-  for (const Session& s : sessions)
+static Session* laPlusRecente(EtatClaude etat) {
+  Session* res = nullptr;
+  for (Session& s : sessions)
     if (s.utilisee && s.etat == etat && (res == nullptr || s.changementMs >= res->changementMs)) res = &s;
   return res;
 }
 
 static const Session* attenteLaPlusRecente() {
   return laPlusRecente(CLAUDE_ATTEND);
+}
+
+// Fait passer la Session affichée (qui attend la plus récente) à « a fini », projet seul. Faux s'il n'y en a pas.
+static bool chasserSessionAffichee(unsigned long maintenantMs) {
+  Session* s = laPlusRecente(CLAUDE_ATTEND);
+  if (s == nullptr) return false;
+  const char* projet = strchr(s->texte, '\n');
+  char copie[sizeof(s->texte)];  // copie : majSession réécrit s->texte
+  strcpy(copie, projet != nullptr ? projet + 1 : "");
+  majSession(*s, CLAUDE_FINI, copie, maintenantMs);
+  return true;
 }
 
 // Anti-rebond d'un Bouton : niveau accepté et instant du dernier changement accepté.
@@ -438,6 +449,13 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
 // Rappel Claude : l'État Claude le plus urgent. Priorité : attend > travaille > a fini > Sans Claude.
 bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
   if (!frontAppui(boutonClaude, enfonce, maintenantMs)) return false;
+
+  // Expression courante interpelle (même sous un Rappel) : l'appui chasse la Session affichée, sans Rappel ni Son.
+  if (etat.expression == EXPR_INTERPELLE && chasserSessionAffichee(maintenantMs)) {
+    rappelActif = false;
+    retour(maintenantMs);
+    return true;
+  }
 
   const Session* s = attenteLaPlusRecente();
   rappel.expression = EXPR_INTERPELLE;
