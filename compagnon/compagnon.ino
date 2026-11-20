@@ -8,6 +8,8 @@
 
 const int BROCHE_BOUTON = 27;  // entre D27 et GND, lu en INPUT_PULLUP (enfoncé = niveau bas)
 
+const int BROCHE_BOUTON_CLAUDE = 26;  // entre D26 et GND, lu comme le Bouton musique
+
 static bool dernierEtatWifi = true;  // forcé à l'opposé au premier tour pour dessiner
 
 // Cadence du redessin périodique : PERIODE_ANIM_MS (etat.h).
@@ -30,7 +32,8 @@ void setup() {
     Serial.println("Écran : introuvable (voir câblage, adresse 0x3C)");
   }
   pinMode(BROCHE_BOUTON, INPUT_PULLUP);
-  etatInit(digitalRead(BROCHE_BOUTON) == LOW);
+  pinMode(BROCHE_BOUTON_CLAUDE, INPUT_PULLUP);
+  etatInit(digitalRead(BROCHE_BOUTON) == LOW, digitalRead(BROCHE_BOUTON_CLAUDE) == LOW);
   buzzerInit();
   reseauInit();
   apiInit();
@@ -42,6 +45,7 @@ void loop() {
   bool aRedessiner = apiMiseAJour();
   aRedessiner |= etatMiseAJour(millis());
   aRedessiner |= etatBouton(digitalRead(BROCHE_BOUTON) == LOW, millis());
+  aRedessiner |= etatBoutonClaude(digitalRead(BROCHE_BOUTON_CLAUDE) == LOW, millis());
   buzzerJouer(etatFrequence(millis()));  // Son courant, sans bloquer la boucle
 
   bool connecte = reseauConnecte();

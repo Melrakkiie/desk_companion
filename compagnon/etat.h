@@ -10,6 +10,7 @@ const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
 const unsigned long DUREE_GIT_PUSH_MS = 3000;
 const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
 const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (aucun Morceau courant)
+const unsigned long DUREE_RAPPEL_CLAUDE_MS = 3000;
 // Le PC renvoie l'état de lecture (music ou music_stop) toutes les 10 s (hook, hors module) ;
 // sans aucune nouvelle pendant 30 s, le Compagnon oublie le Morceau courant (3 renvois manqués).
 const unsigned long OUBLI_MORCEAU_MS = 30000;
@@ -80,7 +81,8 @@ enum Expression {
   EXPR_MUSIQUE,     // music (ticket #8)
   EXPR_PUSH,        // git_push (ticket #9)
   EXPR_JEU,         // Jeu courant : point de retour à la place du Repos
-  EXPR_SILENCE      // Rappel sans Morceau courant : jamais issue d'un Événement
+  EXPR_SILENCE,     // Rappel sans Morceau courant : jamais issue d'un Événement
+  EXPR_SANS_CLAUDE  // Rappel Claude sans Session connue : jamais issue d'un Événement
 };
 
 struct EtatCourant {
@@ -116,8 +118,9 @@ Son etatSonCourant();
 unsigned int etatFrequence(unsigned long maintenantMs);
 
 // Remet l'État au Repos et le Son à SON_AUCUN. boutonEnfonceAuDemarrage : niveau du Bouton à cet
-// instant ; un Bouton déjà tenu ne montre pas de Rappel (il faut le relâcher puis le renfoncer).
-void etatInit(bool boutonEnfonceAuDemarrage = false);
+// instant (musique : D27, Claude : D26) ; un Bouton déjà tenu ne montre pas de Rappel (il faut le
+// relâcher puis le renfoncer).
+void etatInit(bool boutonMusiqueEnfonceAuDemarrage = false, bool boutonClaudeEnfonceAuDemarrage = false);
 
 // État Claude d'une Session (voir GLOSSARY.md).
 enum EtatClaude { CLAUDE_ATTEND, CLAUDE_TRAVAILLE, CLAUDE_FINI };
@@ -139,6 +142,11 @@ bool etatMiseAJour(unsigned long maintenantMs);
 // courant, sinon silence) ; un bouton maintenu ou qui rebondit n'en montre qu'un seul.
 // Renvoie vrai si l'affichage change.
 bool etatBouton(bool enfonce, unsigned long maintenantMs);
+
+// Bouton Claude (D26), mêmes règles que etatBouton, anti-rebond propre. L'appui montre le Rappel
+// Claude (3 s, sans Son) : l'État Claude le plus urgent, « +N » en fin de ligne 1 pour les N autres
+// Sessions connues. Le dernier appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
+bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs);
 
 // Expression à afficher : le Rappel s'il y en a un, sinon l'Expression courante.
 const EtatCourant& etatCourant();

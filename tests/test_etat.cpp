@@ -781,6 +781,133 @@ static void test_sessions_au_dela_de_huit_la_plus_ancienne_est_evincee() {
   assert(etatCourant().expression == EXPR_REPOS);  // s0 évincée : plus rien n'attend
 }
 
+static void test_bouton_claude_sans_session_sans_claude_3s_puis_retour() {
+  etatInit();
+  assert(etatBoutonClaude(true, 1000));
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  assert(strcmp(etatCourant().texte, "pas de Claude") == 0);
+  assert(etatCourant().ligne2[0] == '\0');
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(3999));
+  assert(etatMiseAJour(4000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_claude_attend_interpelle_avec_libelle_et_projet() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nprojet-a", 500, nullptr, "a");
+  etatRecevoir(EV_GAME, "Jeu", 600);
+  assert(etatBoutonClaude(true, 1000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+  assert(etatCourant().dureeMs == 3000);
+  assert(etatMiseAJour(4000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);  // l'Expression courante, en dessous
+}
+
+static void test_bouton_claude_attend_la_plus_recente_avant_fini() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "libelle A\nprojet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 200, nullptr, "b");
+  etatRecevoir(EV_CLAUDE_WAITING, "libelle C\nprojet-c", 300, nullptr, "c");
+  etatBoutonClaude(true, 1000);
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
+}
+
+static void test_bouton_claude_fini_content_de_la_plus_recente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 200, nullptr, "b");
+  etatMiseAJour(10000);
+  etatBoutonClaude(true, 11000);
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strncmp(etatCourant().texte, "projet-b", 8) == 0);
+  assert(etatSonCourant() == SON_CLOCHETTE);  // le Son de claude_done, pas du Rappel
+  assert(etatFrequence(11000 + etatDureeSon(SON_CLOCHETTE)) == 0);
+}
+
+static void test_bouton_claude_compteur_autres_sessions() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet-a", 100, nullptr, "a");
+  etatBoutonClaude(true, 1000);
+  assert(strcmp(etatCourant().texte, "projet-a") == 0);  // une seule : pas de compteur
+  etatBoutonClaude(false, 1100);
+  etatRecevoir(EV_CLAUDE_WORKING, "", 1200, nullptr, "b");
+  etatBoutonClaude(true, 2000);
+  assert(strcmp(etatCourant().texte, "projet-a +1") == 0);
+  etatBoutonClaude(false, 2100);
+  etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-c", 2200, nullptr, "c");
+  etatBoutonClaude(true, 3000);
+  assert(strcmp(etatCourant().texte, "libelle +2") == 0);
+  assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
+}
+
+static void test_bouton_claude_compteur_ne_deborde_pas_la_ligne() {
+  etatInit();
+  char long_[TEXTE_MAX + 20];
+  memset(long_, 'x', sizeof(long_));
+  long_[sizeof(long_) - 1] = '\0';
+  etatRecevoir(EV_CLAUDE_DONE, long_, 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_DONE, "b", 200, nullptr, "b");
+  etatBoutonClaude(true, 1000);
+  assert(strlen(etatCourant().texte) <= TEXTE_MAX);
+  assert(strcmp(etatCourant().texte, "b +1") == 0);
+  etatBoutonClaude(false, 1100);
+  etatRecevoir(EV_CLAUDE_DONE, long_, 1200, nullptr, "a");
+  etatBoutonClaude(true, 2000);
+  assert(strlen(etatCourant().texte) <= TEXTE_MAX);
+  assert(strcmp(etatCourant().texte + strlen(etatCourant().texte) - 3, " +1") == 0);
+}
+
+static void test_bouton_claude_remplace_rappel_musique_et_inversement() {
+  etatInit();
+  etatBouton(true, 1000);
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatBoutonClaude(true, 1500));
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  assert(etatCourant().debutMs == 1500);
+  assert(etatBoutonClaude(false, 1600) == false);
+  assert(etatBouton(false, 1600) == false);
+  assert(etatBouton(true, 2000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatCourant().debutMs == 2000);
+  assert(etatMiseAJour(5000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_boutons_anti_rebond_independants() {
+  etatInit();
+  assert(etatBouton(true, 1000));
+  assert(etatBoutonClaude(true, 1010));   // le rebond de l'autre Bouton ne le concerne pas
+  assert(!etatBoutonClaude(false, 1020)); // rebond de D26 ignoré
+  assert(!etatBoutonClaude(true, 1030));
+  assert(etatCourant().debutMs == 1010);
+  assert(!etatBoutonClaude(false, 1500));
+  assert(etatBoutonClaude(true, 1600));   // vrai nouvel appui
+}
+
+static void test_bouton_claude_tenu_au_demarrage_sans_rappel() {
+  etatInit(false, true);
+  assert(!etatBoutonClaude(true, 100));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(!etatBoutonClaude(false, 500));
+  assert(etatBoutonClaude(true, 1000));
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  etatInit(true, false);  // l'autre Bouton tenu n'empêche pas D26
+  assert(etatBoutonClaude(true, 100));
+}
+
+static void test_rappel_claude_evenement_qui_change_y_met_fin() {
+  etatInit();
+  etatBoutonClaude(true, 1000);
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "", 1500, nullptr, "a"));  // sans effet : le Rappel continue
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  assert(etatRecevoir(EV_GIT_PUSH, "p", 2000));
+  assert(etatCourant().expression == EXPR_PUSH);
+}
+
 int main() {
   test_sessions_working_d_une_autre_ne_coupe_pas_l_attente();
   test_sessions_done_d_une_autre_content_puis_retour_a_l_attente();
@@ -851,6 +978,16 @@ int main() {
   test_rappel_pendant_waiting_retour_a_l_interpellation();
   test_rappel_pendant_expression_qui_expire_retour_au_repos();
   test_rappel_evenement_qui_change_y_met_fin_working_sans_effet_non();
+  test_bouton_claude_sans_session_sans_claude_3s_puis_retour();
+  test_bouton_claude_attend_interpelle_avec_libelle_et_projet();
+  test_bouton_claude_attend_la_plus_recente_avant_fini();
+  test_bouton_claude_fini_content_de_la_plus_recente();
+  test_bouton_claude_compteur_autres_sessions();
+  test_bouton_claude_compteur_ne_deborde_pas_la_ligne();
+  test_bouton_claude_remplace_rappel_musique_et_inversement();
+  test_boutons_anti_rebond_independants();
+  test_bouton_claude_tenu_au_demarrage_sans_rappel();
+  test_rappel_claude_evenement_qui_change_y_met_fin();
   puts("Tous les tests passent.");
   return 0;
 }
