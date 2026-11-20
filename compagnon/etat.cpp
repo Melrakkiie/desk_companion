@@ -26,6 +26,7 @@ static unsigned long nouvellesJeuMs = 0;  // dernier game reçu
 // Sommeil : instant du dernier Événement (tout type) ; endormi = point de retour Endormi.
 static unsigned long dernierEvenementMs = 0;
 static bool endormi = false;
+static bool wifiPrecedent = true;
 
 // Table des Sessions Claude Code : identifiant, État Claude, texte brut du dernier Événement
 // (« libellé\nprojet »), instant du dernier changement. La Session anonyme a l'identifiant "".
@@ -239,6 +240,7 @@ void etatInit(bool boutonMusiqueEnfonceAuDemarrage, bool boutonClaudeEnfonceAuDe
   morceauEnPause = false;
   jeuConnu = false;
   endormi = false;
+  wifiPrecedent = true;
   dernierEvenementMs = 0;
   memset(sessions, 0, sizeof(sessions));
   // tenu au démarrage : pas de front d'appui
@@ -376,9 +378,12 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
   return change;
 }
 
-bool etatMiseAJour(unsigned long maintenantMs) {
+bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte) {
   oublierSiPerime(maintenantMs);
   bool visible = false;
+  // Sans Wi-Fi le Compagnon n'entend rien : pas de Sommeil, et le compte repart au retour du Wi-Fi.
+  if (!wifiConnecte || !wifiPrecedent) dernierEvenementMs = maintenantMs;
+  wifiPrecedent = wifiConnecte;
   if (jeuConnu && maintenantMs - nouvellesJeuMs >= OUBLI_JEU_MS) {  // même effet qu'un game_stop
     if (oublierJeu()) visible = !rappelActif;
   }

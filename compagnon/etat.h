@@ -144,7 +144,7 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
                   const char* artiste = nullptr, const char* session = nullptr);
 
 // À appeler à chaque tour de loop() : renvoie vrai si l'Expression a changé (retour au Repos).
-bool etatMiseAJour(unsigned long maintenantMs);
+bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte = true);
 
 // Bouton : à appeler à chaque tour de loop() avec le niveau brut (vrai = enfoncé) et l'heure.
 // Anti-rebond et front d'appui sont ici. L'enfoncement montre un Rappel (musique du Morceau

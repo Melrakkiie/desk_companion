@@ -43,7 +43,7 @@ void setup() {
 void loop() {
   reseauMiseAJour();
   bool aRedessiner = apiMiseAJour();
-  aRedessiner |= etatMiseAJour(millis());
+  aRedessiner |= etatMiseAJour(millis(), reseauConnecte());
   aRedessiner |= etatBouton(digitalRead(BROCHE_BOUTON) == LOW, millis());
   aRedessiner |= etatBoutonClaude(digitalRead(BROCHE_BOUTON_CLAUDE) == LOW, millis());
   buzzerJouer(etatFrequence(millis()));  // Son courant, sans bloquer la boucle

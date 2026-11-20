@@ -952,6 +952,24 @@ static void test_sommeil_a_2_min_pile_pas_avant() {
   assert(!etatMiseAJour(DELAI_SOMMEIL_MS + 1000));
 }
 
+static void test_pas_de_sommeil_sans_wifi() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS * 3, false);
+  assert(etatCourant().expression == EXPR_REPOS);
+  etatMiseAJour(DELAI_SOMMEIL_MS * 10, false);
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sommeil_2_min_apres_le_retour_du_wifi() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS * 3, false);
+  etatMiseAJour(DELAI_SOMMEIL_MS * 3 + 1000);  // Wi-Fi de retour
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS * 4 + 999));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS * 4 + 1000));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+}
+
 static void test_evenements_reguliers_empechent_le_sommeil() {
   etatInit();
   for (unsigned long t = 10000; t <= 5 * DELAI_SOMMEIL_MS; t += 10000) {
@@ -1276,6 +1294,8 @@ int main() {
   test_sommeil_pendant_un_rappel_retour_a_endormi();
   test_evenements_reveillent_et_s_appliquent();
   test_reveil_sans_son_et_bouton_ne_reveille_pas();
+  test_pas_de_sommeil_sans_wifi();
+  test_sommeil_2_min_apres_le_retour_du_wifi();
   puts("Tous les tests passent.");
   return 0;
 }
