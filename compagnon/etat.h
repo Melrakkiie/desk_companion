@@ -146,7 +146,7 @@ bool etatMiseAJour(unsigned long maintenantMs);
 bool etatBouton(bool enfonce, unsigned long maintenantMs);
 
 // Bouton Claude (D26), mêmes règles que etatBouton, anti-rebond propre. L'appui montre le Rappel
-// Claude (3 s, sans Son) : l'État Claude le plus urgent, « +N » en fin de ligne 1 pour les N autres
+// Claude (3 s, sans Son) : l'État Claude le plus urgent (attend > travaille > a fini > Sans Claude), « +N » en fin de ligne 1 pour les N autres
 // Sessions connues. Le dernier appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
 bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs);
 

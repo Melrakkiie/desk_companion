@@ -35,14 +35,22 @@ struct Session {
 };
 static Session sessions[SESSIONS_MAX];
 
+// Session déjà connue, ou nullptr (ne crée rien).
+static Session* sessionConnue(const char* id) {
+  if (id == nullptr) id = "";
+  for (Session& s : sessions)
+    if (s.utilisee && strncmp(s.id, id, SESSION_ID_MAX) == 0) return &s;
+  return nullptr;
+}
+
 static Session& sessionPour(const char* id, unsigned long maintenantMs) {
   if (id == nullptr) id = "";
+  if (Session* connue = sessionConnue(id)) return *connue;
   Session* libre = nullptr;
   Session* ancienne = &sessions[0];
   for (Session& s : sessions) {
     if (!s.utilisee) { if (libre == nullptr) libre = &s; continue; }
-    if (strncmp(s.id, id, SESSION_ID_MAX) == 0) return s;
-    if (s.changementMs < ancienne->changementMs) ancienne = &s;  // sans effet tant qu'il reste une place libre
+    if (s.changementMs < ancienne->changementMs) ancienne = &s;
   }
   Session& s = libre != nullptr ? *libre : *ancienne;
   s.utilisee = true;
@@ -54,12 +62,12 @@ static Session& sessionPour(const char* id, unsigned long maintenantMs) {
   return s;
 }
 
-// Session déjà connue, ou nullptr (ne crée rien).
-static Session* sessionConnue(const char* id) {
-  if (id == nullptr) id = "";
-  for (Session& s : sessions)
-    if (s.utilisee && strncmp(s.id, id, SESSION_ID_MAX) == 0) return &s;
-  return nullptr;
+// Met la Session dans cet État Claude, à cet instant, avec le texte brut de l'Événement (pour le Rappel Claude).
+static void majSession(Session& s, EtatClaude etat, const char* texte, unsigned long maintenantMs) {
+  s.etat = etat;
+  s.changementMs = maintenantMs;
+  strncpy(s.texte, texte == nullptr ? "" : texte, sizeof(s.texte) - 1);
+  s.texte[sizeof(s.texte) - 1] = '\0';
 }
 
 // Session dans cet État Claude depuis le plus récent changement, ou nullptr. Égalité d'instant : la dernière de la table.
@@ -258,10 +266,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
   switch (type) {
     case EV_CLAUDE_DONE: {
       Session& s = sessionPour(session, maintenantMs);
-      s.etat = CLAUDE_FINI;
-      s.changementMs = maintenantMs;
-      strncpy(s.texte, texte == nullptr ? "" : texte, sizeof(s.texte) - 1);  // pour le Rappel Claude
-      s.texte[sizeof(s.texte) - 1] = '\0';
+      majSession(s, CLAUDE_FINI, texte, maintenantMs);
       demarrerSon(SON_CLOCHETTE, maintenantMs);
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
@@ -297,10 +302,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     // Persistante : la Session attend jusqu'à son propre claude_working ou claude_done.
     case EV_CLAUDE_WAITING: {
       Session& s = sessionPour(session, maintenantMs);
-      s.etat = CLAUDE_ATTEND;
-      s.changementMs = maintenantMs;
-      strncpy(s.texte, texte == nullptr ? "" : texte, sizeof(s.texte) - 1);
-      s.texte[sizeof(s.texte) - 1] = '\0';
+      majSession(s, CLAUDE_ATTEND, texte, maintenantMs);
       installer(EXPR_INTERPELLE, s.texte, false, maintenantMs, 0);
       demarrerSon(SON_CARILLON, maintenantMs);
       return true;
@@ -310,10 +312,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     case EV_CLAUDE_WORKING: {
       Session& s = sessionPour(session, maintenantMs);
       bool affichee = s.etat == CLAUDE_ATTEND && attenteLaPlusRecente() == &s;
-      s.etat = CLAUDE_TRAVAILLE;
-      s.changementMs = maintenantMs;
-      strncpy(s.texte, texte == nullptr ? "" : texte, sizeof(s.texte) - 1);  // pour le Rappel Claude, pas d'affichage direct
-      s.texte[sizeof(s.texte) - 1] = '\0';
+      majSession(s, CLAUDE_TRAVAILLE, texte, maintenantMs);  // texte gardé pour le Rappel Claude, pas d'affichage direct
       if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
       retour(maintenantMs);
       return true;
@@ -393,8 +392,7 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
   return true;
 }
 
-// Rappel Claude : l'État Claude le plus urgent. Priorité : attend > a fini > Sans Claude
-// (le ticket suivant insère « travaille » entre les deux premiers).
+// Rappel Claude : l'État Claude le plus urgent. Priorité : attend > travaille > a fini > Sans Claude.
 bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
   if (!frontAppui(boutonClaude, enfonce, maintenantMs)) return false;
 
@@ -402,8 +400,9 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
   rappel.expression = EXPR_INTERPELLE;
   if (s == nullptr) { s = laPlusRecente(CLAUDE_TRAVAILLE); rappel.expression = EXPR_TRAVAILLE; }
   if (s == nullptr) { s = laPlusRecente(CLAUDE_FINI); rappel.expression = EXPR_CONTENT; }
-  int autres = -1;
-  for (const Session& t : sessions) autres += t.utilisee;
+  int utilisees = 0;
+  for (const Session& t : sessions) if (t.utilisee) utilisees++;
+  int autres = utilisees - 1;  // Sessions autres que celle affichée (-1 si aucune, sans effet)
   if (s == nullptr) {
     rappel.expression = EXPR_SANS_CLAUDE;
     etatVersCp437("pas de Claude", rappel.texte, TEXTE_MAX + 1);
@@ -415,7 +414,8 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     } else {
       lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);
     }
-    if (autres > 0) {  // « +N » en fin de ligne 1 (N <= SESSIONS_MAX - 1 : un chiffre), sans dépasser TEXTE_MAX
+    static_assert(SESSIONS_MAX <= 10, "« +N » doit tenir sur un chiffre (snprintf de 4 octets)");
+    if (autres > 0 && autres <= 9) {  // « +N » en fin de ligne 1 (borne redondante avec le static_assert, pour gcc), sans dépasser TEXTE_MAX
       int n = (int)strlen(rappel.texte);
       if (n > TEXTE_MAX - 3) n = TEXTE_MAX - 3;
       snprintf(rappel.texte + n, 4, " +%d", autres);
