@@ -393,7 +393,6 @@ static void test_son_fanfare_au_push_et_carillon_au_waiting() {
 static void test_son_evenements_silencieux_ne_touchent_pas_au_son() {
   etatInit();
   etatRecevoir(EV_GIT_PUSH, nullptr, 0);
-  etatRecevoir(EV_CLAUDE_DONE, "p", 100);
   etatRecevoir(EV_MUSIC, "titre", 200, "artiste");
   etatRecevoir(EV_CLAUDE_WORKING, nullptr, 300);  // sans effet
   assert(etatSonCourant() == SON_FANFARE);
@@ -444,6 +443,35 @@ static void test_son_frequence_carillon_aux_bornes() {
   assert(etatFrequence(180) == 784);
   assert(etatFrequence(429) == 784);
   assert(etatFrequence(430) == 0);  // terminé
+}
+
+static void test_son_clochette_au_done_aux_bornes() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "p", 0);
+  assert(etatSonCourant() == SON_CLOCHETTE);
+  assert(etatFrequence(0) == 1319);
+  assert(etatFrequence(99) == 1319);
+  assert(etatFrequence(100) == 1568);
+  assert(etatFrequence(199) == 1568);
+  assert(etatFrequence(200) == 2093);
+  assert(etatFrequence(349) == 2093);
+  assert(etatFrequence(350) == 0);  // terminé
+  assert(etatDureeSon(SON_CLOCHETTE) < 500);
+}
+
+static void test_son_clochette_interrompt_et_est_interrompue_seulement_par_un_son() {
+  etatInit();
+  etatRecevoir(EV_GIT_PUSH, nullptr, 0);
+  etatRecevoir(EV_CLAUDE_DONE, "p", 100);  // interrompt la fanfare
+  assert(etatSonCourant() == SON_CLOCHETTE);
+  assert(etatFrequence(100) == 1319);
+  etatRecevoir(EV_CLAUDE_WAITING, nullptr, 200);  // interrompt la clochette
+  assert(etatSonCourant() == SON_CARILLON);
+  etatRecevoir(EV_CLAUDE_DONE, "p", 300);  // interrompt le carillon
+  assert(etatSonCourant() == SON_CLOCHETTE);
+  etatRecevoir(EV_MUSIC, "titre", 320, "artiste");  // sans Son : ne l'interrompt pas
+  assert(etatSonCourant() == SON_CLOCHETTE);
+  assert(etatFrequence(420) == 1568);
 }
 
 static void test_son_durees_totales() {
@@ -639,6 +667,8 @@ int main() {
   test_son_nouveau_son_remplace_et_repart_du_debut();
   test_son_frequence_fanfare_aux_bornes();
   test_son_frequence_carillon_aux_bornes();
+  test_son_clochette_au_done_aux_bornes();
+  test_son_clochette_interrompt_et_est_interrompue_seulement_par_un_son();
   test_son_durees_totales();
   test_cp437_accents_francais();
   test_cp437_largeur_en_glyphes_et_troncature();
