@@ -296,12 +296,16 @@ static void test_music_duree_avec_deux_lignes_dans_le_texte() {
   assert(etatCourant().dureeMs == 2 * p && p * 2 > DUREE_MUSIC_MS);
 }
 
+// Signe de vie du PC (music_stop) : empêche le Sommeil sans toucher aux Sessions.
+static void signe_de_vie(unsigned long ms) { etatRecevoir(EV_MUSIC_STOP, nullptr, ms); }
+
 static void test_waiting_persistante_ne_revient_jamais_seule() {
   etatInit();
   assert(etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?", 100));
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
   assert(!etatCourant().temporaire);
+  signe_de_vie(100 + OUBLI_SESSION_MS - 2);
   assert(!etatMiseAJour(100 + OUBLI_SESSION_MS - 1));  // seul l'oubli des Sessions muettes (12 h) y met fin
   assert(etatCourant().expression == EXPR_INTERPELLE);
 }
@@ -811,12 +815,16 @@ static void test_session_muette_12h_est_oubliee() {
   etatInit();
   etatRecevoir(EV_CLAUDE_DONE, "fantome", 0, nullptr, "f");
   etatRecevoir(EV_CLAUDE_WAITING, "A", 1000, nullptr, "a");
+  signe_de_vie(OUBLI_SESSION_MS - 2);
   assert(!etatMiseAJour(OUBLI_SESSION_MS - 1));  // f encore connue
+  signe_de_vie(OUBLI_SESSION_MS - 1);
   assert(!etatMiseAJour(OUBLI_SESSION_MS));      // f oubliée, l'affichage (A) ne change pas
   etatBoutonClaude(true, OUBLI_SESSION_MS + 1);
   assert(strcmp(etatCourant().texte, "A") == 0);  // plus de « +1 »
   etatBoutonClaude(false, OUBLI_SESSION_MS + 100);
+  signe_de_vie(OUBLI_SESSION_MS + 500);
   assert(!etatMiseAJour(OUBLI_SESSION_MS + 1000));  // A oubliée sous le Rappel : pas encore visible
+  signe_de_vie(OUBLI_SESSION_MS + 2000);
   assert(etatMiseAJour(OUBLI_SESSION_MS + 1 + DUREE_RAPPEL_CLAUDE_MS));  // fin du Rappel : le Repos
   assert(etatCourant().expression == EXPR_REPOS);
 }
@@ -824,6 +832,7 @@ static void test_session_muette_12h_est_oubliee() {
 static void test_session_affichee_muette_12h_retour_au_repos() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  signe_de_vie(OUBLI_SESSION_MS - 1);
   assert(etatMiseAJour(OUBLI_SESSION_MS));
   assert(etatCourant().expression == EXPR_REPOS);
 }
@@ -878,6 +887,7 @@ static void test_attente_ne_disparait_pas_avec_le_temps_meme_a_plusieurs() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
   etatRecevoir(EV_CLAUDE_WAITING, "B", 10, nullptr, "b");
+  signe_de_vie(OUBLI_SESSION_MS - 2);
   etatMiseAJour(OUBLI_SESSION_MS - 1);  // juste avant l'oubli des Sessions muettes
   assert(strcmp(etatCourant().texte, "B") == 0);
   etatRecevoir(EV_CLAUDE_END, nullptr, OUBLI_SESSION_MS - 1, nullptr, "b");
@@ -928,6 +938,18 @@ static void test_bouton_claude_travaille_avant_fini() {
   assert(etatCourant().expression == EXPR_TRAVAILLE);
   assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
   assert(etatCourant().dureeMs == 3000);
+}
+
+static void test_sommeil_a_2_min_pile_pas_avant() {
+  etatInit();
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS - 1));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatCourant().texte[0] == '\0' && etatCourant().ligne2[0] == '\0');
+  assert(!etatCourant().temporaire);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS + 1000));
 }
 
 static void test_bouton_claude_attend_avant_travaille() {
@@ -1150,6 +1172,7 @@ int main() {
   test_bouton_claude_attend_avant_travaille();
   test_bouton_claude_travaille_la_plus_recente();
   test_claude_working_hors_rappel_ne_change_rien();
+  test_sommeil_a_2_min_pile_pas_avant();
   puts("Tous les tests passent.");
   return 0;
 }

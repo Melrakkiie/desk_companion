@@ -23,6 +23,10 @@ static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
 static bool jeuConnu = false;
 static unsigned long nouvellesJeuMs = 0;  // dernier game reçu
 
+// Sommeil : instant du dernier Événement (tout type) ; endormi = point de retour Endormi.
+static unsigned long dernierEvenementMs = 0;
+static bool endormi = false;
+
 // Table des Sessions Claude Code : identifiant, État Claude, texte brut du dernier Événement
 // (« libellé\nprojet »), instant du dernier changement. La Session anonyme a l'identifiant "".
 // Pleine, la plus ancienne (changementMs minimal) cède la place à une nouvelle Session.
@@ -205,6 +209,7 @@ static void retour(unsigned long maintenantMs) {
   const Session* attente = attenteLaPlusRecente();
   if (attente != nullptr) installer(EXPR_INTERPELLE, attente->texte, false, maintenantMs, 0);
   else if (jeuConnu) jeu(maintenantMs);
+  else if (endormi) installer(EXPR_ENDORMI, nullptr, false, maintenantMs, 0);
   else repos();
 }
 
@@ -233,6 +238,8 @@ void etatInit(bool boutonMusiqueEnfonceAuDemarrage, bool boutonClaudeEnfonceAuDe
   morceauConnu = false;
   morceauEnPause = false;
   jeuConnu = false;
+  endormi = false;
+  dernierEvenementMs = 0;
   memset(sessions, 0, sizeof(sessions));
   // tenu au démarrage : pas de front d'appui
   boutonMusique = {boutonMusiqueEnfonceAuDemarrage, false, 0};
@@ -358,7 +365,12 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
 // Un Événement qui change l'Expression met fin au Rappel ; sans effet (false), il ne l'interrompt pas.
 bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
                   const char* artiste, const char* session) {
-  bool change = recevoir(type, texte, maintenantMs, artiste, session);
+  // N'importe quel Événement remet le compte à zéro et réveille (sans Son) avant de s'appliquer.
+  dernierEvenementMs = maintenantMs;
+  bool reveil = endormi;
+  endormi = false;
+  if (etat.expression == EXPR_ENDORMI) repos();
+  bool change = recevoir(type, texte, maintenantMs, artiste, session) || (reveil && !rappelActif);
   if (type == EV_GAME || type == EV_GAME_STOP) return change && !rappelActif;  // le Rappel continue
   if (change) rappelActif = false;
   return change;
@@ -373,6 +385,15 @@ bool etatMiseAJour(unsigned long maintenantMs) {
   for (Session& s : sessions)  // même effet qu'un claude_end (Session tuée sans SessionEnd)
     if (s.utilisee && maintenantMs - s.changementMs >= OUBLI_SESSION_MS && oublierSession(s, maintenantMs))
       visible = !rappelActif;
+  if (!endormi && maintenantMs - dernierEvenementMs >= DELAI_SOMMEIL_MS) {
+    endormi = true;  // avant l'oubli : le retour() d'une Session affichée donne alors Endormi
+    for (Session& s : sessions)
+      if (s.utilisee) oublierSession(s, maintenantMs);
+    if (!etat.temporaire && etat.expression != EXPR_ENDORMI) {  // une Expression temporaire finit sa durée
+      retour(maintenantMs);
+      visible = !rappelActif;
+    }
+  }
   if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
     rappelActif = false;
     visible = true;
