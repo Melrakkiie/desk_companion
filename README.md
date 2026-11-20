@@ -22,8 +22,8 @@ everyday, and **the Mascot**, Claude Code's pixel-art critter, for everything Cl
 |:-:|:-:|:-:|
 | <img src="docs/screens/idle.gif" width="260"> | <img src="docs/screens/music.gif" width="260"> | <img src="docs/screens/push.gif" width="260"> |
 | **Idle**: smiles and blinks now and then. The banner only speaks up if Wi-Fi drops. | **Music**: dances between bouncing notes; title and artist scroll in the banner. | **Git push**: looks up in awe as an arrow flies, with a victory fanfare. |
-| <img src="docs/screens/game.gif" width="260"> | <img src="docs/screens/no_music.gif" width="260"> | |
-| **Gaming**: gamer headset on, focused frown, controller in hand. Replaces Idle while a Steam or Lutris game runs. | **No music**: music button pressed while nothing plays. | |
+| <img src="docs/screens/game.gif" width="260"> | <img src="docs/screens/no_music.gif" width="260"> | <img src="docs/screens/asleep.gif" width="260"> |
+| **Gaming**: gamer headset on, focused frown, controller in hand. Replaces Idle while a Steam or Lutris game runs. | **No music**: music button pressed while nothing plays. | **Asleep**: after 2 minutes with no event from any PC. Eyes closed, "z"s rising. The music button shows "Gros dodo temps". |
 
 ### Claude Code
 
