@@ -75,7 +75,7 @@ Once connected, the companion answers at `http://compagnon.local` (mDNS).
 ## Sending events
 
 One route, `POST /event`, with a JSON body: `type`, an optional `text` (a `\n` splits the banner into two
-lines), plus `artist` for music and `session` for Claude events.
+lines), plus `artist` for music and video (the channel) and `session` for Claude events.
 
 ```sh
 curl -X POST -H 'Content-Type: application/json' \
@@ -88,6 +88,7 @@ curl -X POST -H 'Content-Type: application/json' \
 | `claude_done` | Done | bell |
 | `claude_working`, `claude_end` | updates session state | — |
 | `music` / `music_stop` | Music / forgets the track | — |
+| `video` | Video (same fields as `music`: `text` = title, `artist` = channel); replaces the current track | — |
 | `game` / `game_stop` | Gaming as fallback / back to Idle | — |
 | `git_push` | Push | fanfare |
 
