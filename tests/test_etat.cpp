@@ -819,9 +819,9 @@ static void test_session_muette_12h_est_oubliee() {
   assert(!etatMiseAJour(OUBLI_SESSION_MS - 1));  // f encore connue
   signe_de_vie(OUBLI_SESSION_MS - 1);
   assert(!etatMiseAJour(OUBLI_SESSION_MS));      // f oubliée, l'affichage (A) ne change pas
-  etatBoutonClaude(true, OUBLI_SESSION_MS + 1);
-  assert(strcmp(etatCourant().texte, "A") == 0);  // plus de « +1 »
-  etatBoutonClaude(false, OUBLI_SESSION_MS + 100);
+  etatBouton(true, OUBLI_SESSION_MS + 1);  // un Rappel par-dessus interpelle (le Bouton Claude chasserait A)
+  assert(etatCourant().expression == EXPR_SILENCE);
+  etatBouton(false, OUBLI_SESSION_MS + 100);
   signe_de_vie(OUBLI_SESSION_MS + 500);
   assert(!etatMiseAJour(OUBLI_SESSION_MS + 1000));  // A oubliée sous le Rappel : pas encore visible
   signe_de_vie(OUBLI_SESSION_MS + 2000);
@@ -909,7 +909,7 @@ static void test_bouton_claude_sans_session_sans_claude_3s_puis_retour() {
 static void test_bouton_claude_attend_interpelle_avec_libelle_et_projet() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nprojet-a", 500, nullptr, "a");
-  etatRecevoir(EV_GAME, "Jeu", 600);
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 600);  // Expression temporaire au-dessus de l'attente : pas de chasse
   assert(etatBoutonClaude(true, 1000));
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
@@ -924,6 +924,7 @@ static void test_bouton_claude_attend_la_plus_recente_avant_fini() {
   etatRecevoir(EV_CLAUDE_WAITING, "libelle A\nprojet-a", 100, nullptr, "a");
   etatRecevoir(EV_CLAUDE_DONE, "projet-b", 200, nullptr, "b");
   etatRecevoir(EV_CLAUDE_WAITING, "libelle C\nprojet-c", 300, nullptr, "c");
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 350);  // pas interpelle : le Bouton Claude montre le Rappel
   etatBoutonClaude(true, 1000);
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
@@ -1081,6 +1082,7 @@ static void test_bouton_claude_attend_avant_travaille() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-a", 100, nullptr, "a");
   etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 200, nullptr, "b");
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 900);  // pas interpelle : le Bouton Claude montre le Rappel
   etatBoutonClaude(true, 1000);
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
@@ -1126,6 +1128,7 @@ static void test_bouton_claude_compteur_autres_sessions() {
   assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
   etatBoutonClaude(false, 2100);
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-c", 2200, nullptr, "c");
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 2900);  // pas interpelle : le Bouton Claude montre le Rappel
   etatBoutonClaude(true, 3000);
   assert(strcmp(etatCourant().texte, "libelle  \xB3 3 sessions") == 0);
   assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
@@ -1144,14 +1147,17 @@ static void test_bouton_claude_compteur_ne_deborde_pas_la_ligne() {
   long_[sizeof(long_) - 1] = '\0';
   etatRecevoir(EV_CLAUDE_DONE, "b", 100, nullptr, "b");
   etatRecevoir(EV_CLAUDE_WAITING, "permission\nprojet", 200, nullptr, "c");
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 900);  // pas interpelle : le Bouton Claude montre le Rappel
   etatBoutonClaude(true, 1000);
   assert(strcmp(etatCourant().texte, "permission\xB3" "2 sessions") == 0);  // à l'étroit : sans espace après « │ »
   etatBoutonClaude(false, 1100);
   etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nprojet", 1200, nullptr, "c");
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 1900);
   etatBoutonClaude(true, 2000);
   assert(strcmp(etatCourant().texte, "autorisation ? \xB3 2 sessions") == 0);  // trop long : à la suite, défile
   etatBoutonClaude(false, 2100);
   etatRecevoir(EV_CLAUDE_WAITING, long_, 2200, nullptr, "c");
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 2900);
   etatBoutonClaude(true, 3000);
   assert(strlen(etatCourant().texte) <= TEXTE_MAX);
   assert(strcmp(etatCourant().texte + strlen(etatCourant().texte) - 13, " \xB3 2 sessions") == 0);
@@ -1204,7 +1210,79 @@ static void test_rappel_claude_evenement_qui_change_y_met_fin() {
   assert(etatCourant().expression == EXPR_PUSH);
 }
 
+static void test_bouton_claude_pendant_interpelle_chasse_la_session_vers_repos_sans_son_ni_rappel() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  assert(etatBoutonClaude(true, 100000));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatFrequence(100000) == 0);  // le carillon est fini et rien de neuf ne sonne
+  assert(!etatMiseAJour(100100));  // pas de Rappel à expirer
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_claude_chasse_vers_jeu_quand_un_jeu_tourne() {
+  etatInit();
+  etatRecevoir(EV_GAME, "Jeu", 50);
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  assert(etatBoutonClaude(true, 1000));
+  assert(etatCourant().expression == EXPR_JEU);
+}
+
+static void test_bouton_claude_deux_sessions_attendent_chasse_une_a_la_fois_sans_carillon() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-b", 200, nullptr, "b");
+  assert(etatBoutonClaude(true, 100000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+  assert(etatFrequence(100000) == 0);  // pas de carillon
+  assert(!etatBoutonClaude(true, 100100));  // maintenu : une seule Session chassée
+  etatBoutonClaude(false, 100200);
+  assert(etatBoutonClaude(true, 101000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_claude_session_chassee_reste_suivie_en_fini() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 150, nullptr, "b");
+  etatBoutonClaude(true, 1000);
+  etatBoutonClaude(false, 1100);
+  assert(etatBoutonClaude(true, 2000));  // plus interpelle : Rappel Claude, B travaille
+  assert(etatCourant().expression == EXPR_TRAVAILLE);
+  etatBoutonClaude(false, 2100);
+  etatRecevoir(EV_CLAUDE_END, nullptr, 2200, nullptr, "b");
+  assert(etatBoutonClaude(true, 3000));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strcmp(etatCourant().texte, "Done!") == 0);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+}
+
+static void test_bouton_claude_chasse_met_fin_au_rappel_musique_au_dessus_d_interpelle() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  assert(etatBouton(true, 1000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatBoutonClaude(true, 1500));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_claude_session_chassee_qui_attend_a_nouveau_interpelle_avec_carillon() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  etatBoutonClaude(true, 100000);
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 105000, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(etatFrequence(105000) != 0);
+}
+
 int main() {
+  test_bouton_claude_deux_sessions_attendent_chasse_une_a_la_fois_sans_carillon();
+  test_bouton_claude_session_chassee_reste_suivie_en_fini();
+  test_bouton_claude_chasse_met_fin_au_rappel_musique_au_dessus_d_interpelle();
+  test_bouton_claude_session_chassee_qui_attend_a_nouveau_interpelle_avec_carillon();
+  test_bouton_claude_pendant_interpelle_chasse_la_session_vers_repos_sans_son_ni_rappel();
+  test_bouton_claude_chasse_vers_jeu_quand_un_jeu_tourne();
   test_end_de_la_session_affichee_passe_a_la_suivante_sans_carillon();
   test_end_d_une_session_non_affichee_ne_change_rien_et_l_oublie();
   test_end_d_une_session_inconnue_est_sans_effet();

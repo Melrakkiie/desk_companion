@@ -439,6 +439,20 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
 bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
   if (!frontAppui(boutonClaude, enfonce, maintenantMs)) return false;
 
+  // Expression courante interpelle (même sous un Rappel) : l'appui chasse la Session affichée, sans Rappel ni Son.
+  if (etat.expression == EXPR_INTERPELLE) {
+    Session* chassee = const_cast<Session*>(attenteLaPlusRecente());
+    if (chassee != nullptr) {
+      const char* projet = strchr(chassee->texte, '\n');  // une Session qui a fini ne garde que le projet
+      memmove(chassee->texte, projet != nullptr ? projet + 1 : "", projet != nullptr ? strlen(projet + 1) + 1 : 1);
+      chassee->etat = CLAUDE_FINI;
+      chassee->changementMs = maintenantMs;
+      rappelActif = false;
+      retour(maintenantMs);
+      return true;
+    }
+  }
+
   const Session* s = attenteLaPlusRecente();
   rappel.expression = EXPR_INTERPELLE;
   if (s == nullptr) { s = laPlusRecente(CLAUDE_TRAVAILLE); rappel.expression = EXPR_TRAVAILLE; }
