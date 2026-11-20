@@ -544,8 +544,8 @@ static void test_oubli_apres_30s_sans_nouvelles() {
   assert(etatBouton(true, OUBLI_MORCEAU_MS - 1));  // 1 ms avant l'oubli : encore le morceau
   assert(etatCourant().expression == EXPR_MUSIQUE);
   etatBouton(false, OUBLI_MORCEAU_MS + 100);
-  etatMiseAJour(OUBLI_MORCEAU_MS + 100000);  // fin du Rappel
-  assert(etatBouton(true, OUBLI_MORCEAU_MS + 200000));  // plus de nouvelles depuis longtemps
+  etatMiseAJour(OUBLI_MORCEAU_MS + 10000);  // fin du Rappel
+  assert(etatBouton(true, OUBLI_MORCEAU_MS + 20000));  // plus de nouvelles depuis longtemps
   assert(etatCourant().expression == EXPR_SILENCE);
 }
 
@@ -1002,6 +1002,28 @@ static void test_sommeil_pendant_un_rappel_retour_a_endormi() {
   assert(etatCourant().expression == EXPR_ENDORMI);
 }
 
+static void test_rappel_musique_pendant_le_sommeil_gros_dodo_temps() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  unsigned long t = DELAI_SOMMEIL_MS + 1000;
+  assert(etatBouton(true, t));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(strcmp(etatCourant().texte, "Gros dodo temps") == 0);
+  assert(etatCourant().ligne2[0] == '\0');
+  assert(etatCourant().temporaire);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(t + DUREE_SILENCE_MS - 1));
+  assert(strcmp(etatCourant().texte, "Gros dodo temps") == 0);
+  assert(etatMiseAJour(t + DUREE_SILENCE_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatCourant().texte[0] == '\0');
+  assert(etatSonCourant() == SON_AUCUN);
+  // l'appui n'a pas réveillé : le Sommeil continue
+  assert(!etatMiseAJour(t + DUREE_SILENCE_MS + 1000));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+}
+
 static void test_evenements_reveillent_et_s_appliquent() {
   etatInit();
   etatMiseAJour(DELAI_SOMMEIL_MS);
@@ -1245,6 +1267,7 @@ int main() {
   test_music_stop_compte_comme_des_nouvelles();
   test_rappel_musique_puis_retour();
   test_rappel_silence_sans_music();
+  test_rappel_musique_pendant_le_sommeil_gros_dodo_temps();
   test_bouton_rebonds_et_maintien_un_seul_rappel();
   test_bouton_tenu_au_demarrage_sans_rappel();
   test_bouton_nouvel_appui_relance_le_rappel();
