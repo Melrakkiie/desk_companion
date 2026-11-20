@@ -25,7 +25,7 @@ _À éviter_ : bip, alarme, notification.
 
 **Endormi** : le point de retour pendant le Sommeil ; il prend la place du Repos. Boule aux yeux fermés (deux traits), bouche en petit « o », des « z » qui montent lentement dans la Zone visage ; Bandeau vide. Le Rappel musique y montre Endormi avec « Gros dodo temps » dans le Bandeau, à la place de Silence.
 
-**Boule** : la petite mascotte toute ronde du Compagnon (corps rond, antenne à pompon, yeux et bouche en noir sur le corps). Toutes les Expressions qui ne concernent pas Claude (Repos, Endormi, Jeu, musique, Silence, push) en sont une variation ; les Expressions Claude montrent la Mascotte.
+**Boule** : la petite mascotte toute ronde du Compagnon (corps rond, antenne à pompon, yeux et bouche en noir sur le corps). Toutes les Expressions qui ne concernent pas Claude (Repos, Endormi, Jeu, musique, vidéo, Silence, push) en sont une variation ; les Expressions Claude montrent la Mascotte.
 _À éviter_ : visage, mascotte (réservé à celle de Claude).
 
 **Jeu** : le point de retour tant qu'il y a un Jeu courant et qu'aucune Session n'attend ; elle prend la place du Repos. Boule concentrée qui cligne des yeux, une manette dans la Zone visage, le nom du jeu dans le Bandeau.
@@ -41,13 +41,16 @@ _À éviter_ : partie, jeu en cours.
 **Bouton** : un des deux boutons physiques du Compagnon, le **Bouton musique** ou le **Bouton Claude**. Un appui montre un Rappel, sauf l'appui sur le Bouton Claude pendant interpelle : il chasse la Session affichée (elle passe à « a fini », avec son projet seul, et le Compagnon revient au point de retour, sans Rappel ni Son). Un appui n'est pas un Événement : il ne vient pas du PC.
 _À éviter_ : touche, interrupteur.
 
-**Rappel** : ce que montre un appui sur un Bouton (sauf le Bouton Claude pendant interpelle), par-dessus l'Expression courante sans la remplacer, pendant une durée propre à son type et sans Son. Le **Rappel musique** (Bouton musique) montre l'Expression musique du Morceau courant, ou Silence s'il n'y en a pas (Endormi pendant le Sommeil). Le **Rappel Claude** (Bouton Claude) montre l'État Claude le plus urgent. À la fin du Rappel, le Compagnon revient à l'Expression courante. Un nouvel appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
+**Rappel** : ce que montre un appui sur un Bouton (sauf le Bouton Claude pendant interpelle), par-dessus l'Expression courante sans la remplacer, pendant une durée propre à son type et sans Son. Le **Rappel musique** (Bouton musique) montre ce qui joue : l'Expression musique du Morceau courant ou l'Expression vidéo de la Vidéo courante, sinon Silence (Endormi pendant le Sommeil). Le **Rappel Claude** (Bouton Claude) montre l'État Claude le plus urgent. À la fin du Rappel, le Compagnon revient à l'Expression courante. Un nouvel appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
 _À éviter_ : popup, superposition, aperçu.
 
-**Morceau courant** : le dernier morceau annoncé par `music`, tant que la lecture n'a pas été mise en pause ou arrêtée (`music_stop`). Il n'y en a pas toujours. Un morceau mis en pause reste connu du Compagnon : s'il reprend, il redevient Morceau courant sans être réaffiché. Le PC rappelle l'état de lecture toutes les 10 s ; sans nouvelles pendant 30 s, il n'y a plus de Morceau courant.
+**Morceau courant** : le dernier morceau annoncé par `music`, tant que la lecture n'a pas été mise en pause ou arrêtée (`music_stop`). Il n'y en a pas toujours. Un morceau mis en pause reste connu du Compagnon : s'il reprend, il redevient Morceau courant sans être réaffiché. Le PC rappelle l'état de lecture toutes les 10 s ; sans nouvelles pendant 30 s, il n'y a plus de Morceau courant. Il n'y a jamais à la fois un Morceau courant et une Vidéo courante : l'un remplace l'autre.
 _À éviter_ : musique en cours, chanson.
 
-**Silence** : l'Expression qui dit qu'il n'y a pas de Morceau courant : Bandeau « pas de musique », note barrée, temporaire, sans Son.
+**Vidéo courante** : comme le Morceau courant, mais pour une vidéo (annoncée par `video`, le texte est son titre, accompagné de sa chaîne) : mêmes règles de pause, de reprise, de rappel toutes les 10 s et d'oubli après 30 s. Le PC décide d'après l'adresse de ce qui joue : un site vidéo connu (YouTube hors YouTube Music, Twitch…) ou un fichier vidéo est une vidéo, tout le reste est un morceau. Un clip regardé sur YouTube est donc une vidéo, le même titre écouté sur YouTube Music un morceau.
+_À éviter_ : film, vidéo en cours.
+
+**Silence** : l'Expression qui dit qu'il n'y a ni Morceau courant ni Vidéo courante : Bandeau « Silence radio », note barrée, temporaire, sans Son.
 
 **Session** : une conversation Claude Code ouverte sur le PC, du premier Événement Claude reçu jusqu'à `claude_end`, ou jusqu'à 12 h sans aucun Événement de sa part (Session fermée sans `claude_end`). Plusieurs Sessions peuvent tourner en parallèle ; le Compagnon en connaît au plus 8 et oublie la plus ancienne quand il en apprend une neuvième.
 _À éviter_ : conversation, instance, onglet.
@@ -70,7 +73,8 @@ _À éviter_ : avatar, logo, sprite.
 | `claude_working` | On a répondu à une Session, elle reprend son travail | aucune ; si cette Session attendait, interpelle passe à la Session suivante qui attend, sinon s'en va | — |
 | `claude_end` | Une Session s'est fermée | aucune : la Session est oubliée (comme `claude_working` si elle attendait) | — |
 | `music` | Un morceau est en cours de lecture (le texte est le titre, accompagné d'un artiste) ; renvoyé toutes les 10 s pendant la lecture | musique, temporaire ; aucune si c'est le morceau déjà connu (reprise après pause) | — |
-| `music_stop` | La lecture a été mise en pause ou arrêtée, ou le lecteur s'est fermé ; renvoyé toutes les 10 s tant que rien ne joue | aucune : il n'y a plus de Morceau courant | — |
+| `video` | Une vidéo est en cours de lecture (le texte est le titre, accompagné de la chaîne) ; renvoyé toutes les 10 s pendant la lecture | vidéo, temporaire ; aucune si c'est la vidéo déjà connue (reprise après pause) | — |
+| `music_stop` | La lecture (morceau ou vidéo) a été mise en pause ou arrêtée, ou le lecteur s'est fermé ; renvoyé toutes les 10 s tant que rien ne joue | aucune : il n'y a plus ni Morceau courant ni Vidéo courante | — |
 | `git_push` | Un push git a été fait | animation de push, temporaire | fanfare |
 | `game` | Un jeu tourne (le texte est son nom) ; renvoyé toutes les 10 s | change le point de retour | — |
 | `game_stop` | Aucun jeu ne tourne ; renvoyé toutes les 10 s | change le point de retour : il n'y a plus de Jeu courant | — |
@@ -83,6 +87,7 @@ _À éviter_ : avatar, logo, sprite.
 - `game`, `game_stop`, `claude_working` et `claude_end` ne changent que le point de retour : le changement ne se voit tout de suite que si l'Expression courante est le point de retour ; sinon il attend la fin de l'Expression courante.
 - Un `game` portant un autre nom de jeu met à jour le Bandeau de Jeu sur place.
 - Il n'y a jamais qu'un seul Jeu courant, même si plusieurs jeux tournent.
+- Un morceau et une vidéo de même titre et de même artiste sont deux choses différentes : passer de l'un à l'autre affiche la nouvelle Expression.
 - Le Rappel Claude montre, par ordre de priorité, la Session qui attend la plus récente (interpelle), sinon celle qui travaille la plus récente (travaille), sinon celle qui a fini la plus récente (content), sinon Sans Claude. La ligne 1 du Bandeau dit l'état (« Working », « Done! » ou le libellé d'attente, « Hey? ») ; le projet est en ligne 2. Quand plusieurs Sessions sont connues, « │ N sessions » au bord droit de la ligne 1 en donne le nombre total.
 - La décision se prend sur l'Expression courante : si elle est interpelle (même sous un Rappel, qui prend fin), l'appui sur le Bouton Claude ne montre pas de Rappel, il chasse la Session affichée. Elle reste suivie et compte dans « N sessions » ; si l'Expression courante n'est pas interpelle (content d'une autre Session par-dessus l'attente, par exemple), l'appui montre le Rappel.
 - Pendant un Rappel, l'Expression courante continue sa vie : une Expression temporaire peut expirer en dessous, et le Rappel revient alors au point de retour.
