@@ -604,7 +604,7 @@ static void test_rappel_silence_sans_music() {
   etatInit();
   assert(etatBouton(true, 1000));
   assert(etatCourant().expression == EXPR_SILENCE);
-  assert(strcmp(etatCourant().texte, "pas de musique") == 0);
+  assert(strcmp(etatCourant().texte, "Silence radio") == 0);
   assert(etatCourant().ligne2[0] == '\0');
   assert(etatSonCourant() == SON_AUCUN);
   assert(!etatMiseAJour(3999));
@@ -1281,7 +1281,111 @@ static void test_bouton_claude_session_chassee_qui_attend_a_nouveau_interpelle_a
   assert(etatFrequence(105000) != 0);
 }
 
+// --- Vidéo courante (#70) ---
+
+static void test_video_reconnue_et_installe_expression_video() {
+  TypeEvenement type;
+  assert(etatTypeDepuisNom("video", &type) && type == EV_VIDEO);
+  etatInit();
+  assert(etatRecevoir(EV_VIDEO, "Titre", 1000, "Chaine"));
+  assert(etatCourant().expression == EXPR_VIDEO);
+  assert(strcmp(etatCourant().texte, "Titre") == 0);
+  assert(strcmp(etatCourant().ligne2, "Chaine") == 0);
+  assert(etatCourant().temporaire);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(etatCourant().dureeMs == DUREE_MUSIC_MS);
+  assert(!etatMiseAJour(1000 + DUREE_MUSIC_MS - 1));
+  assert(etatMiseAJour(1000 + DUREE_MUSIC_MS));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_video_duree_identique_a_musique_pour_textes_longs() {
+  const char* longTitre = "Un titre vraiment tres tres long qui defile sur le Bandeau de la Boule";
+  etatInit();
+  etatRecevoir(EV_MUSIC, longTitre, 0, "Chaine");
+  unsigned long dMusique = etatCourant().dureeMs;
+  etatInit();
+  etatRecevoir(EV_VIDEO, longTitre, 0, "Chaine");
+  assert(etatCourant().dureeMs == dMusique);
+  assert(dMusique > DUREE_MUSIC_MS);
+}
+
+static void test_meme_video_apres_music_stop_pas_de_reaffichage() {
+  etatInit();
+  etatRecevoir(EV_VIDEO, "Titre", 0, "Chaine");
+  etatMiseAJour(DUREE_MUSIC_MS);
+  etatRecevoir(EV_MUSIC_STOP, nullptr, 11000);
+  assert(!etatRecevoir(EV_VIDEO, "Titre", 12000, "Chaine"));
+  assert(etatBouton(true, 13000));
+  assert(etatCourant().expression == EXPR_VIDEO);
+}
+
+static void test_music_puis_video_et_inverse_remplacent_et_rappel_montre_la_derniere() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Morceau", 0, "Artiste");
+  assert(etatRecevoir(EV_VIDEO, "Film", 1000, "Chaine"));
+  assert(etatCourant().expression == EXPR_VIDEO);
+  etatMiseAJour(1000 + DUREE_MUSIC_MS);
+  assert(etatBouton(true, 12000));
+  assert(etatCourant().expression == EXPR_VIDEO);
+  assert(strcmp(etatCourant().texte, "Film") == 0);
+  etatBouton(false, 12100);
+  etatMiseAJour(12000 + DUREE_SILENCE_MS + 30000);
+  etatRecevoir(EV_VIDEO, "Film", 50000, "Chaine");
+  assert(etatRecevoir(EV_MUSIC, "Morceau", 51000, "Artiste"));
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+  etatMiseAJour(51000 + DUREE_MUSIC_MS);
+  assert(etatBouton(true, 62000));
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+  assert(strcmp(etatCourant().texte, "Morceau") == 0);
+}
+
+static void test_meme_titre_et_artiste_de_music_a_video_reaffiche_et_inversement() {
+  etatInit();
+  etatRecevoir(EV_MUSIC, "Titre", 0, "Quelqu un");
+  assert(etatRecevoir(EV_VIDEO, "Titre", 1000, "Quelqu un"));
+  assert(etatCourant().expression == EXPR_VIDEO);
+  assert(etatRecevoir(EV_MUSIC, "Titre", 2000, "Quelqu un"));
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+}
+
+static void test_video_puis_music_stop_rappel_silence() {
+  etatInit();
+  etatRecevoir(EV_VIDEO, "Titre", 0, "Chaine");
+  etatMiseAJour(DUREE_MUSIC_MS);
+  etatRecevoir(EV_MUSIC_STOP, nullptr, 11000);
+  assert(etatBouton(true, 12000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+}
+
+static void test_video_oubliee_apres_30s_sans_nouvelles() {
+  etatInit();
+  etatRecevoir(EV_VIDEO, "Titre", 0, "Chaine");
+  etatMiseAJour(DUREE_MUSIC_MS);
+  assert(etatBouton(true, OUBLI_MORCEAU_MS + 1000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+  // la même vidéo revenue ensuite s'affiche de nouveau
+  etatBouton(false, OUBLI_MORCEAU_MS + 1100);
+  etatMiseAJour(OUBLI_MORCEAU_MS + 20000);
+  assert(etatRecevoir(EV_VIDEO, "Titre", OUBLI_MORCEAU_MS + 21000, "Chaine"));
+}
+
+static void test_video_compte_comme_nouvelle_du_pc_pour_le_sommeil() {
+  etatInit();
+  etatRecevoir(EV_VIDEO, "Titre", DELAI_SOMMEIL_MS - 1000, "Chaine");
+  etatMiseAJour(DELAI_SOMMEIL_MS + 5000);
+  assert(etatCourant().expression != EXPR_ENDORMI);
+}
+
 int main() {
+  test_video_reconnue_et_installe_expression_video();
+  test_video_duree_identique_a_musique_pour_textes_longs();
+  test_meme_video_apres_music_stop_pas_de_reaffichage();
+  test_music_puis_video_et_inverse_remplacent_et_rappel_montre_la_derniere();
+  test_meme_titre_et_artiste_de_music_a_video_reaffiche_et_inversement();
+  test_video_puis_music_stop_rappel_silence();
+  test_video_oubliee_apres_30s_sans_nouvelles();
+  test_video_compte_comme_nouvelle_du_pc_pour_le_sommeil();
   test_bouton_claude_deux_sessions_attendent_chasse_une_a_la_fois_sans_carillon();
   test_bouton_claude_session_chassee_reste_suivie_en_fini();
   test_bouton_claude_chasse_met_fin_au_rappel_musique_au_dessus_d_interpelle();

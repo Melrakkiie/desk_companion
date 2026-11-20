@@ -4,18 +4,19 @@
 
 static EtatCourant etat;  // l'Expression courante, que le Rappel recouvre sans la toucher
 
-// Rappel (appui sur le Bouton) et Morceau connu : le dernier music reçu, en pause compris (copie de etat) ;
-// seul un Morceau connu non en pause est le Morceau courant (voir GLOSSARY.md).
+// Rappel (appui sur le Bouton) et lecture connue (ce qui joue : morceau ou vidéo) : le dernier music ou
+// video reçu, en pause compris (copie de etat) ; seule une lecture connue non en pause est le Morceau
+// courant ou la Vidéo courante (voir GLOSSARY.md).
 static EtatCourant rappel;
 static bool rappelActif = false;
-static EtatCourant morceau;
-static bool morceauConnu = false;
-static bool morceauEnPause = false;  // connu mais plus courant (music_stop)
-static unsigned long nouvellesMusiqueMs = 0;  // dernier music ou music_stop reçu
+static EtatCourant lecture;
+static bool lectureConnue = false;
+static bool lectureEnPause = false;  // connue mais plus courante (music_stop)
+static unsigned long nouvellesLectureMs = 0;  // dernier music, video ou music_stop reçu
 
-// Sans nouvelles depuis OUBLI_MORCEAU_MS : le morceau n'est plus connu (le prochain music s'affiche).
+// Sans nouvelles depuis OUBLI_MORCEAU_MS : la lecture n'est plus connue (le prochain music ou video s'affiche).
 static void oublierSiPerime(unsigned long maintenantMs) {
-  if (morceauConnu && maintenantMs - nouvellesMusiqueMs >= OUBLI_MORCEAU_MS) morceauConnu = false;
+  if (lectureConnue && maintenantMs - nouvellesLectureMs >= OUBLI_MORCEAU_MS) lectureConnue = false;
 }
 
 // Jeu courant : le dernier game reçu, tant qu'il n'est ni arrêté (game_stop) ni oublié.
@@ -248,9 +249,9 @@ void etatInit(bool boutonMusiqueEnfonceAuDemarrage, bool boutonClaudeEnfonceAuDe
   repos();
   sonCourant = SON_AUCUN;
   rappelActif = false;
-  morceauConnu = false;
-  morceauEnPause = false;
-  jeuConnu = false;
+  lectureConnue = false;
+  lectureEnPause = false;
+jeuConnu = false;
   endormi = false;
   wifiPrecedent = true;
   dernierEvenementMs = 0;
@@ -261,7 +262,7 @@ void etatInit(bool boutonMusiqueEnfonceAuDemarrage, bool boutonClaudeEnfonceAuDe
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
-  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop", "claude_end"};
+  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop", "claude_end", "video"};
   if (nom == nullptr) return false;
   for (unsigned i = 0; i < sizeof(NOMS) / sizeof(*NOMS); i++) {
     if (strcmp(nom, NOMS[i]) == 0) {
@@ -308,29 +309,32 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
       demarrerSon(SON_FANFARE, maintenantMs);
       return true;
-    case EV_MUSIC: {
-      // Même morceau que le connu (reprise après pause) : redevient courant, sans réaffichage.
+    case EV_MUSIC:
+    case EV_VIDEO: {
+      // Même chose que la connue (genre compris ; reprise après pause) : redevient courante, sans réaffichage.
+      const Expression genre = type == EV_VIDEO ? EXPR_VIDEO : EXPR_MUSIQUE;
       oublierSiPerime(maintenantMs);
-      nouvellesMusiqueMs = maintenantMs;
+      nouvellesLectureMs = maintenantMs;
       char l1[TEXTE_MAX + 1], l2[TEXTE_MAX + 1];
       lignesBandeau(texte, artiste, l1, l2);
-      if (morceauConnu && strcmp(l1, morceau.texte) == 0 && strcmp(l2, morceau.ligne2) == 0) {
-        morceauEnPause = false;
+      if (lectureConnue && lecture.expression == genre && strcmp(l1, lecture.texte) == 0 &&
+          strcmp(l2, lecture.ligne2) == 0) {
+        lectureEnPause = false;
         return false;
       }
-      installer(EXPR_MUSIQUE, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
+      installer(genre, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
       // la durée dépend des textes tronqués réellement conservés
       etat.dureeMs = etatDureeMusique(etat.texte, etat.ligne2);
-      morceau = etat;
-      morceauConnu = true;
-      morceauEnPause = false;
+      lecture = etat;
+      lectureConnue = true;
+      lectureEnPause = false;
       return true;
     }
-    // Pause ou arrêt : le morceau reste connu mais n'est plus courant ; l'Expression ne change pas.
+    // Pause ou arrêt : la lecture reste connue mais n'est plus courante ; l'Expression ne change pas.
     case EV_MUSIC_STOP:
       oublierSiPerime(maintenantMs);
-      nouvellesMusiqueMs = maintenantMs;
-      morceauEnPause = true;
+      nouvellesLectureMs = maintenantMs;
+      lectureEnPause = true;
       return false;
     // Persistante : la Session attend jusqu'à son propre claude_working ou claude_done.
     case EV_CLAUDE_WAITING: {
@@ -432,11 +436,11 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
   if (!frontAppui(boutonMusique, enfonce, maintenantMs)) return false;
 
   oublierSiPerime(maintenantMs);
-  if (morceauConnu && !morceauEnPause) {
-    rappel = morceau;
+  if (lectureConnue && !lectureEnPause) {
+    rappel = lecture;
   } else {
     rappel.expression = endormi ? EXPR_ENDORMI : EXPR_SILENCE;
-    etatVersCp437(endormi ? "Gros dodo temps" : "pas de musique", rappel.texte, TEXTE_MAX + 1);
+    etatVersCp437(endormi ? "Gros dodo temps" : "Silence radio", rappel.texte, TEXTE_MAX + 1);
     rappel.ligne2[0] = '\0';
     rappel.dureeMs = DUREE_SILENCE_MS;
   }

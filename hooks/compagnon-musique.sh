@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Lecteur multimédia -> Compagnon. Suit `playerctl --follow metadata` (MPRIS) et envoie en POST /event
-# l'état de lecture : `music` (titre + artiste) si un morceau joue, `music_stop` sinon (pause, arrêt,
-# sans titre, lecteur fermé). Envoi à chaque changement, puis renvoi de l'état courant toutes les 10 s :
+# l'état de lecture : `video` (titre + chaîne) si l'adresse (xesam:url) est une vidéo, `music` (titre + artiste)
+# si un morceau joue, `music_stop` sinon (pause, arrêt, sans titre,
+# lecteur fermé). Envoi à chaque changement, puis renvoi de l'état courant toutes les 10 s :
 # le Compagnon rattrape ainsi l'état réel après un redémarrage, un envoi perdu ou une cible injoignable,
 # et reconnaît lui-même un morceau déjà connu (le script ne garde aucune mémoire de ce qu'il a envoyé).
 # Tourne en arrière-plan, sans jamais s'arrêter ni bloquer, même si le Compagnon est injoignable.
@@ -18,7 +19,25 @@ renvoi_s=${COMPAGNON_MUSIQUE_RENVOI_S:-10}  # période de renvoi ; garder < 30 s
 # Séparateur de champs : \x1f n'est pas un blanc, donc `read` garde un artiste vide
 # (une tabulation serait avalée) et les accents passent tels quels.
 sep=$'\x1f'
-source_cmd=${COMPAGNON_MUSIQUE_SOURCE:-"playerctl --follow metadata --format '{{status}}${sep}{{artist}}${sep}{{title}}'"}
+source_cmd=${COMPAGNON_MUSIQUE_SOURCE:-"playerctl --follow metadata --format '{{status}}${sep}{{artist}}${sep}{{title}}${sep}{{xesam:url}}'"}
+
+# genre_de ADRESSE : affiche `video` ou `music`. Règle en dur, à allonger quand un cas se présente :
+# sites vidéo (youtube.com et sous-domaines sauf music.youtube.com) et fichiers vidéo locaux ; le reste,
+# adresse vide comprise, est un morceau.
+genre_de() {
+  local u=${1,,} hote
+  case $u in
+    file://*) case $u in *.mkv|*.mp4|*.webm|*.avi|*.mov|*.m4v) echo video; return;; esac ;;
+    *://*) hote=${u#*://}; hote=${hote%%[/?#]*}; hote=${hote##*@}; hote=${hote%%:*}
+      case $hote in
+        music.youtube.com) ;;
+        youtube.com|*.youtube.com|youtu.be|twitch.tv|*.twitch.tv|netflix.com|*.netflix.com|\
+        primevideo.com|*.primevideo.com|disneyplus.com|*.disneyplus.com|vimeo.com|*.vimeo.com|\
+        dailymotion.com|*.dailymotion.com|crunchyroll.com|*.crunchyroll.com) echo video; return;;
+      esac ;;
+  esac
+  echo music
+}
 
 corps_stop='{"type":"music_stop"}'
 corps=$corps_stop  # état courant à annoncer (survit aux relances de la source)
@@ -37,13 +56,14 @@ while true; do
   # `playerctl --follow` se termine quand le dernier lecteur se ferme (ou s'il n'y en a pas) :
   # on attend puis on relance, au lieu de mourir.
   while true; do
-    IFS=$sep read -r -t "$renvoi_s" statut artiste titre
+    IFS=$sep read -r -t "$renvoi_s" statut artiste titre adresse
     rc=$?
     if [ $rc -eq 0 ]; then
       # Lecture : music (reprise d'un morceau après pause : renvoyé) ; sinon music_stop.
       if [ "$statut" = Playing ] && [ -n "$titre" ]; then
-        corps_music=$(jq -nc --arg text "$titre" --arg artist "$artiste" \
-          '{type: "music", text: $text, artist: $artist}' 2>/dev/null) || continue
+        genre=$(genre_de "$adresse")
+        corps_music=$(jq -nc --arg type "$genre" --arg text "$titre" --arg artist "$artiste" \
+          '{type: $type, text: $text, artist: $artist}' 2>/dev/null) || continue
         corps=$corps_music
       else
         corps=$corps_stop

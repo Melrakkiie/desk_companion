@@ -9,10 +9,10 @@
 const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
 const unsigned long DUREE_GIT_PUSH_MS = 3000;
 const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
-const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (aucun Morceau courant)
+const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (ni Morceau ni Vidéo courante)
 const unsigned long DUREE_RAPPEL_CLAUDE_MS = 3000;
 // Le PC renvoie l'état de lecture (music ou music_stop) toutes les 10 s (hook, hors module) ;
-// sans aucune nouvelle pendant 30 s, le Compagnon oublie le Morceau courant (3 renvois manqués).
+// sans aucune nouvelle pendant 30 s, le Compagnon oublie le Morceau ou la Vidéo courante (3 renvois manqués).
 const unsigned long OUBLI_MORCEAU_MS = 30000;
 // Même principe pour le Jeu courant : le PC renvoie game ou game_stop toutes les 10 s (hors module).
 const unsigned long OUBLI_JEU_MS = 30000;
@@ -78,7 +78,8 @@ enum TypeEvenement {
   EV_MUSIC_STOP,
   EV_GAME,       // texte = nom du jeu
   EV_GAME_STOP,
-  EV_CLAUDE_END  // SessionEnd : la Session est oubliée
+  EV_CLAUDE_END, // SessionEnd : la Session est oubliée
+  EV_VIDEO       // texte = titre, artiste = chaîne : la Vidéo courante (et plus de Morceau courant : l'un remplace l'autre)
 };
 
 enum Expression {
@@ -88,10 +89,11 @@ enum Expression {
   EXPR_MUSIQUE,     // music (ticket #8)
   EXPR_PUSH,        // git_push (ticket #9)
   EXPR_JEU,         // Jeu courant : point de retour à la place du Repos
-  EXPR_SILENCE,     // Rappel sans Morceau courant : jamais issue d'un Événement
+  EXPR_SILENCE,     // Rappel sans Morceau ni Vidéo courante : jamais issue d'un Événement
   EXPR_SANS_CLAUDE, // Rappel Claude sans Session connue : jamais issue d'un Événement
   EXPR_TRAVAILLE,   // Rappel Claude d'une Session qui travaille : jamais issue d'un Événement
-  EXPR_ENDORMI      // point de retour pendant le Sommeil : jamais issue d'un Événement
+  EXPR_ENDORMI,     // point de retour pendant le Sommeil : jamais issue d'un Événement
+  EXPR_VIDEO        // video : temporaire, sans Son, durée de l'Expression musique
 };
 
 struct EtatCourant {
@@ -148,7 +150,7 @@ bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte = true);
 
 // Bouton : à appeler à chaque tour de loop() avec le niveau brut (vrai = enfoncé) et l'heure.
 // Anti-rebond et front d'appui sont ici. L'enfoncement montre un Rappel (musique du Morceau
-// courant, sinon silence) ; un bouton maintenu ou qui rebondit n'en montre qu'un seul.
+// courant ou vidéo de la Vidéo courante, sinon silence) ; un bouton maintenu ou qui rebondit n'en montre qu'un seul.
 // Renvoie vrai si l'affichage change.
 bool etatBouton(bool enfonce, unsigned long maintenantMs);
 

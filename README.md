@@ -1,7 +1,7 @@
 # Desk Companion
 
 A tiny ESP32 buddy that sits on your desk and reacts to what your PC is doing: Claude Code sessions,
-the music you're playing, the game you launched, every `git push`.
+the music or video you're playing, the game you launched, every `git push`.
 
 <p align="center"><img src="docs/screens/idle.gif" alt="Idle: the Ball smiles and blinks" width="420"></p>
 
@@ -20,10 +20,12 @@ everyday, and **the Mascot**, Claude Code's pixel-art critter, for everything Cl
 
 | | | |
 |:-:|:-:|:-:|
-| <img src="docs/screens/idle.gif" width="260"> | <img src="docs/screens/music.gif" width="260"> | <img src="docs/screens/push.gif" width="260"> |
-| **Idle**: smiles and blinks now and then. The banner only speaks up if Wi-Fi drops. | **Music**: dances between bouncing notes; title and artist scroll in the banner. | **Git push**: looks up in awe as an arrow flies, with a victory fanfare. |
-| <img src="docs/screens/game.gif" width="260"> | <img src="docs/screens/no_music.gif" width="260"> | <img src="docs/screens/asleep.gif" width="260"> |
-| **Gaming**: gamer headset on, focused frown, controller in hand. Replaces Idle while a Steam or Lutris game runs. | **No music**: music button pressed while nothing plays. | **Asleep**: after 2 minutes with no event from any PC. Eyes closed, "z"s rising. The music button shows "Gros dodo temps". |
+| <img src="docs/screens/idle.gif" width="260"> | <img src="docs/screens/music.gif" width="260"> | <img src="docs/screens/video.gif" width="260"> |
+| **Idle**: smiles and blinks now and then. The banner only speaks up if Wi-Fi drops. | **Music**: dances between bouncing notes; title and artist scroll in the banner. | **Video**: wide-eyed, stares at a small screen with a ▶; title and channel scroll in the banner. |
+| <img src="docs/screens/push.gif" width="260"> | <img src="docs/screens/game.gif" width="260"> | <img src="docs/screens/no_music.gif" width="260"> |
+| **Git push**: looks up in awe as an arrow flies, with a victory fanfare. | **Gaming**: gamer headset on, focused frown, controller in hand. Replaces Idle while a Steam or Lutris game runs. | **Silence**: music button pressed while no track or video plays ("Silence radio"). |
+| <img src="docs/screens/asleep.gif" width="260"> | | |
+| **Asleep**: after 2 minutes with no event from any PC. Eyes closed, "z"s rising. The music button shows "Gros dodo temps". | | |
 
 ### Claude Code
 
@@ -39,12 +41,15 @@ everyday, and **the Mascot**, Claude Code's pixel-art critter, for everything Cl
 - **Fallback screen**: when nothing else is showing, the companion returns to *Waiting* if a Claude
   session waits for you, otherwise *Gaming* if a game runs, otherwise *Idle*. After 2 minutes with no
   event at all, it falls asleep (eyes closed, rising "z"s) and *Asleep* replaces *Idle* until the next event.
-- **Temporary screens** (Done, Music, Push) show for a few seconds, then return to the fallback.
+- **Temporary screens** (Done, Music, Video, Push) show for a few seconds, then return to the fallback.
 - **Two buttons** show a quick reminder on top of the current screen, silently: the **music button**
-  shows the current track (or *No music*), the **Claude button** shows the most urgent session
+  shows the current track or video (or *Silence*), the **Claude button** shows the most urgent session
   (waiting > working > done, or *No Claude*).
 - Up to **8 Claude sessions** are tracked in parallel; a session silent for 12 h is forgotten.
-- Music and game state are re-sent by the PC every 10 s and forgotten after 30 s without news.
+- Only one thing plays at a time: a new track replaces the current video and vice versa. The PC tells
+  them apart by the address of what plays (YouTube, Twitch, Netflix…, or a local video file → video;
+  anything else, YouTube Music included → music).
+- Music, video and game state are re-sent by the PC every 10 s and forgotten after 30 s without news.
 
 The full domain vocabulary and rules live in [`GLOSSARY.md`](GLOSSARY.md) (French).
 
@@ -75,7 +80,7 @@ Once connected, the companion answers at `http://compagnon.local` (mDNS).
 ## Sending events
 
 One route, `POST /event`, with a JSON body: `type`, an optional `text` (a `\n` splits the banner into two
-lines), plus `artist` for music and `session` for Claude events.
+lines), plus `artist` for music and video (the channel) and `session` for Claude events.
 
 ```sh
 curl -X POST -H 'Content-Type: application/json' \
@@ -87,7 +92,8 @@ curl -X POST -H 'Content-Type: application/json' \
 | `claude_waiting` | Waiting | chime |
 | `claude_done` | Done | bell |
 | `claude_working`, `claude_end` | updates session state | — |
-| `music` / `music_stop` | Music / forgets the track | — |
+| `music` / `music_stop` | Music / stops the track or video | — |
+| `video` | Video (same fields as `music`: `text` = title, `artist` = channel); replaces the current track | — |
 | `game` / `game_stop` | Gaming as fallback / back to Idle | — |
 | `git_push` | Push | fanfare |
 
@@ -97,7 +103,7 @@ Ready-made senders live in [`hooks/`](hooks/README.md) (Linux; need `jq` and `cu
 
 - `compagnon-hook.sh`: Claude Code hooks (`Stop`, `Notification`, `SessionEnd`…), see `settings-extrait.json`.
 - `compagnon-push.sh`: a global git `reference-transaction` hook that fires on every successful push.
-- `compagnon-musique.sh`: follows `playerctl`, run as a systemd user service.
+- `compagnon-musique.sh`: follows `playerctl` and sends `music` or `video`, run as a systemd user service.
 - `compagnon-jeu.sh`: detects Steam (native or Proton) and Lutris games, run as a systemd user service.
 
 Installation steps are detailed in [`hooks/README.md`](hooks/README.md) (French).
