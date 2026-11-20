@@ -17,7 +17,8 @@ static void test_claude_done_puis_retour_au_repos_apres_5s() {
   etatInit();
   assert(etatRecevoir(EV_CLAUDE_DONE, "mon-projet", 1000));
   assert(etatCourant().expression == EXPR_CONTENT);
-  assert(strcmp(etatCourant().texte, "mon-projet") == 0);
+  assert(strcmp(etatCourant().texte, "Done!") == 0);  // comme dans le Rappel : le projet en ligne 2
+  assert(strcmp(etatCourant().ligne2, "mon-projet") == 0);
 
   assert(!etatMiseAJour(5999));  // 4,999 s : toujours content
   assert(etatCourant().expression == EXPR_CONTENT);
@@ -32,7 +33,7 @@ static void test_le_dernier_evenement_gagne() {
   etatInit();
   etatRecevoir(EV_CLAUDE_DONE, "projet-a", 0);
   etatRecevoir(EV_CLAUDE_DONE, "projet-b", 3000);
-  assert(strcmp(etatCourant().texte, "projet-b") == 0);
+  assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
   assert(!etatMiseAJour(5000));  // l'échéance de la 1re requête est oubliée
   assert(etatMiseAJour(8000));   // 3000 + 5000
   assert(etatCourant().expression == EXPR_REPOS);
@@ -43,15 +44,17 @@ static void test_texte_trop_long_tronque() {
   char long_texte[200];
   memset(long_texte, 'x', sizeof(long_texte));
   long_texte[199] = '\0';
-  etatRecevoir(EV_CLAUDE_DONE, long_texte, 0);
+  etatRecevoir(EV_GIT_PUSH, long_texte, 0);
   assert(strlen(etatCourant().texte) == (size_t)TEXTE_MAX);
 }
 
 static void test_evenement_sans_texte() {
   etatInit();
-  etatRecevoir(EV_CLAUDE_DONE, nullptr, 0);
-  assert(etatCourant().expression == EXPR_CONTENT);
+  etatRecevoir(EV_GIT_PUSH, nullptr, 0);
+  assert(etatCourant().expression == EXPR_PUSH);
   assert(etatCourant().texte[0] == '\0');
+  etatRecevoir(EV_CLAUDE_DONE, nullptr, 0);
+  assert(strcmp(etatCourant().texte, "Done!") == 0 && etatCourant().ligne2[0] == '\0');
 }
 
 static void test_game_au_repos_affiche_jeu_puis_game_stop_ramene_au_repos() {
@@ -171,7 +174,7 @@ static void test_artiste_vide_par_defaut() {
   etatInit();
   assert(etatCourant().ligne2[0] == '\0');
   etatRecevoir(EV_CLAUDE_DONE, "projet", 0, "quelqu'un");
-  assert(etatCourant().ligne2[0] == '\0');  // claude_done ignore l'artiste
+  assert(strcmp(etatCourant().ligne2, "projet") == 0);  // claude_done ignore l'artiste
 }
 
 static void test_push_temporaire_3s_puis_repos() {
@@ -253,9 +256,9 @@ static void test_texte_coupe_au_premier_saut_de_ligne() {
   etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nmon_projet", 0);
   assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
   assert(strcmp(etatCourant().ligne2, "mon_projet") == 0);
-  etatRecevoir(EV_CLAUDE_DONE, "seul", 0);  // sans '\n' : une seule ligne
+  etatRecevoir(EV_GIT_PUSH, "seul", 0);  // sans '\n' : une seule ligne
   assert(strcmp(etatCourant().texte, "seul") == 0 && etatCourant().ligne2[0] == '\0');
-  etatRecevoir(EV_CLAUDE_DONE, "a\nb\nc", 0);  // au plus deux lignes : le 2e '\n' coupe la ligne 2
+  etatRecevoir(EV_GIT_PUSH, "a\nb\nc", 0);  // au plus deux lignes : le 2e '\n' coupe la ligne 2
   assert(strcmp(etatCourant().texte, "a") == 0 && strcmp(etatCourant().ligne2, "b") == 0);
   etatRecevoir(EV_GIT_PUSH, "a\n\xC3\xA9t\xC3\xA9", 0);  // accents de la ligne 2 convertis en CP437
   assert(strlen(etatCourant().ligne2) == 3);
@@ -275,7 +278,7 @@ static void test_chaque_ligne_tronquee_a_100() {
   memset(texte + 151, 'y', 150 - 1);
   texte[300 - 1] = '\0';
   etatInit();
-  etatRecevoir(EV_CLAUDE_DONE, texte, 0);
+  etatRecevoir(EV_GIT_PUSH, texte, 0);
   assert(strlen(etatCourant().texte) == 100 && strlen(etatCourant().ligne2) == 100);
 }
 
@@ -322,7 +325,7 @@ static void test_waiting_working_sans_effet_pendant_done() {
   etatRecevoir(EV_CLAUDE_DONE, "projet", 0);
   assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 10));
   assert(etatCourant().expression == EXPR_CONTENT);
-  assert(strcmp(etatCourant().texte, "projet") == 0);
+  assert(strcmp(etatCourant().ligne2, "projet") == 0);
   assert(etatCourant().temporaire);
 }
 
@@ -369,11 +372,11 @@ static void test_cp437_accents_francais() {
 }
 
 static void test_cp437_largeur_en_glyphes_et_troncature() {
-  etatRecevoir(EV_CLAUDE_DONE, "été", 0);
+  etatRecevoir(EV_GIT_PUSH, "été", 0);
   assert(strlen(etatCourant().texte) == 3 && etatLargeurTexte(etatCourant().texte) == 3 * LARGEUR_CHAR_PX);
   char longTexte[300] = "";
   for (int i = 0; i < 120; i++) strcat(longTexte, "é");
-  etatRecevoir(EV_CLAUDE_DONE, longTexte, 0);
+  etatRecevoir(EV_GIT_PUSH, longTexte, 0);
   assert((int)strlen(etatCourant().texte) == TEXTE_MAX);
 }
 
@@ -677,7 +680,7 @@ static void test_sessions_done_d_une_autre_content_puis_retour_a_l_attente() {
   etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
   assert(etatRecevoir(EV_CLAUDE_DONE, "B", 1000, nullptr, "b"));
   assert(etatCourant().expression == EXPR_CONTENT);
-  assert(strcmp(etatCourant().texte, "B") == 0);
+  assert(strcmp(etatCourant().ligne2, "B") == 0);
   assert(etatMiseAJour(1000 + DUREE_CLAUDE_DONE_MS));
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().texte, "A") == 0);
@@ -958,7 +961,8 @@ static void test_bouton_claude_fini_content_de_la_plus_recente() {
   etatMiseAJour(10000);
   etatBoutonClaude(true, 11000);
   assert(etatCourant().expression == EXPR_CONTENT);
-  assert(strncmp(etatCourant().texte, "projet-b", 8) == 0);
+  assert(strncmp(etatCourant().texte, "Done!", 5) == 0);  // comme « Working » : le projet en ligne 2
+  assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
   assert(etatSonCourant() == SON_CLOCHETTE);  // le Son de claude_done, pas du Rappel
   assert(etatFrequence(11000 + etatDureeSon(SON_CLOCHETTE)) == 0);
 }
@@ -967,16 +971,23 @@ static void test_bouton_claude_compteur_autres_sessions() {
   etatInit();
   etatRecevoir(EV_CLAUDE_DONE, "projet-a", 100, nullptr, "a");
   etatBoutonClaude(true, 1000);
-  assert(strcmp(etatCourant().texte, "projet-a") == 0);  // une seule : pas de compteur
+  assert(strcmp(etatCourant().texte, "Done!") == 0);  // une seule : pas de compteur
   etatBoutonClaude(false, 1100);
   etatRecevoir(EV_CLAUDE_DONE, "projet-b", 1200, nullptr, "b");
   etatBoutonClaude(true, 2000);
-  assert(strcmp(etatCourant().texte, "projet-b +1") == 0);
+  assert(strcmp(etatCourant().texte, "Done!    \xB3 2 sessions") == 0);  // 21 glyphes : compteur au bord droit
+  assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
   etatBoutonClaude(false, 2100);
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-c", 2200, nullptr, "c");
   etatBoutonClaude(true, 3000);
-  assert(strcmp(etatCourant().texte, "libelle +2") == 0);
+  assert(strcmp(etatCourant().texte, "libelle  \xB3 3 sessions") == 0);
   assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
+  etatBoutonClaude(false, 3100);
+  etatRecevoir(EV_CLAUDE_END, nullptr, 3200, nullptr, "c");
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 3300, nullptr, "b");
+  etatBoutonClaude(true, 4000);
+  assert(strcmp(etatCourant().texte, "Working  \xB3 2 sessions") == 0);  // « Working » reste à gauche
+  assert(etatLargeurTexte(etatCourant().texte) <= LARGEUR_ECRAN_PX);
 }
 
 static void test_bouton_claude_compteur_ne_deborde_pas_la_ligne() {
@@ -984,16 +995,19 @@ static void test_bouton_claude_compteur_ne_deborde_pas_la_ligne() {
   char long_[TEXTE_MAX + 20];
   memset(long_, 'x', sizeof(long_));
   long_[sizeof(long_) - 1] = '\0';
-  etatRecevoir(EV_CLAUDE_DONE, long_, 100, nullptr, "a");
-  etatRecevoir(EV_CLAUDE_DONE, "b", 200, nullptr, "b");
+  etatRecevoir(EV_CLAUDE_DONE, "b", 100, nullptr, "b");
+  etatRecevoir(EV_CLAUDE_WAITING, "permission\nprojet", 200, nullptr, "c");
   etatBoutonClaude(true, 1000);
-  assert(strlen(etatCourant().texte) <= TEXTE_MAX);
-  assert(strcmp(etatCourant().texte, "b +1") == 0);
+  assert(strcmp(etatCourant().texte, "permission\xB3" "2 sessions") == 0);  // à l'étroit : sans espace après « │ »
   etatBoutonClaude(false, 1100);
-  etatRecevoir(EV_CLAUDE_DONE, long_, 1200, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nprojet", 1200, nullptr, "c");
   etatBoutonClaude(true, 2000);
+  assert(strcmp(etatCourant().texte, "autorisation ? \xB3 2 sessions") == 0);  // trop long : à la suite, défile
+  etatBoutonClaude(false, 2100);
+  etatRecevoir(EV_CLAUDE_WAITING, long_, 2200, nullptr, "c");
+  etatBoutonClaude(true, 3000);
   assert(strlen(etatCourant().texte) <= TEXTE_MAX);
-  assert(strcmp(etatCourant().texte + strlen(etatCourant().texte) - 3, " +1") == 0);
+  assert(strcmp(etatCourant().texte + strlen(etatCourant().texte) - 13, " \xB3 2 sessions") == 0);
 }
 
 static void test_bouton_claude_remplace_rappel_musique_et_inversement() {
