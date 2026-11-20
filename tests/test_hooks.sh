@@ -36,23 +36,26 @@ verifie() {
 }
 
 verifie "Stop -> claude_done" \
-  '{"hook_event_name":"Stop","cwd":"/home/a/Projects/mon_projet"}' \
-  '/event application/json {"type":"claude_done","text":"mon_projet"}'
+  '{"hook_event_name":"Stop","session_id":"s1","cwd":"/home/a/Projects/mon_projet"}' \
+  '/event application/json {"type":"claude_done","text":"mon_projet","session":"s1"}'
 verifie "Notification autorisation -> claude_waiting" \
-  '{"hook_event_name":"Notification","notification_type":"permission_prompt","cwd":"/x/mon_projet"}' \
-  '/event application/json {"type":"claude_waiting","text":"autorisation ?\nmon_projet"}'
+  '{"hook_event_name":"Notification","notification_type":"permission_prompt","session_id":"s1","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_waiting","text":"autorisation ?\nmon_projet","session":"s1"}'
 verifie "Notification attente -> claude_waiting" \
-  '{"hook_event_name":"Notification","notification_type":"idle_prompt","cwd":"/x/mon_projet"}' \
-  '/event application/json {"type":"claude_waiting","text":"à toi !\nmon_projet"}'
+  '{"hook_event_name":"Notification","notification_type":"idle_prompt","session_id":"s1","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_waiting","text":"à toi !\nmon_projet","session":"s1"}'
 verifie "Notification d'un autre type -> rien envoyé" \
-  '{"hook_event_name":"Notification","notification_type":"auth_success","cwd":"/x/mon_projet"}' \
+  '{"hook_event_name":"Notification","notification_type":"auth_success","session_id":"s1","cwd":"/x/mon_projet"}' \
   ''
 verifie "UserPromptSubmit -> claude_working" \
-  '{"hook_event_name":"UserPromptSubmit","cwd":"/x/mon_projet"}' \
-  '/event application/json {"type":"claude_working","text":"mon_projet"}'
+  '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_working","text":"mon_projet","session":"s1"}'
 verifie "PostToolUse -> claude_working" \
-  '{"hook_event_name":"PostToolUse","cwd":"/x/mon_projet"}' \
-  '/event application/json {"type":"claude_working","text":"mon_projet"}'
+  '{"hook_event_name":"PostToolUse","session_id":"s1","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_working","text":"mon_projet","session":"s1"}'
+verifie "Sans session_id -> pas de champ session" \
+  '{"hook_event_name":"Stop","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_done","text":"mon_projet"}'
 
 # Cible injoignable : le script rend la main vite, code 0, sans rien écrire.
 debut=$(date +%s%N)

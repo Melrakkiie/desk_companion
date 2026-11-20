@@ -22,6 +22,45 @@ static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
 static bool jeuConnu = false;
 static unsigned long nouvellesJeuMs = 0;  // dernier game reçu
 
+// Table des Sessions Claude Code : identifiant, État Claude, texte brut du dernier Événement
+// (« libellé\nprojet »), instant du dernier changement. La Session anonyme a l'identifiant "".
+// Pleine, la plus ancienne (changementMs minimal) cède la place à une nouvelle Session.
+struct Session {
+  bool utilisee;
+  char id[SESSION_ID_MAX + 1];
+  EtatClaude etat;
+  char texte[TEXTE_MAX * 2 + 2];  // les deux lignes brutes ; tronqué ensuite par installer
+  unsigned long changementMs;
+};
+static Session sessions[SESSIONS_MAX];
+
+static Session& sessionPour(const char* id, unsigned long maintenantMs) {
+  if (id == nullptr) id = "";
+  Session* libre = nullptr;
+  Session* ancienne = &sessions[0];
+  for (Session& s : sessions) {
+    if (!s.utilisee) { if (libre == nullptr) libre = &s; continue; }
+    if (strncmp(s.id, id, SESSION_ID_MAX) == 0) return s;
+    if (s.changementMs < ancienne->changementMs) ancienne = &s;  // sans effet tant qu'il reste une place libre
+  }
+  Session& s = libre != nullptr ? *libre : *ancienne;
+  s.utilisee = true;
+  strncpy(s.id, id, SESSION_ID_MAX);
+  s.id[SESSION_ID_MAX] = '\0';
+  s.etat = CLAUDE_FINI;
+  s.texte[0] = '\0';
+  s.changementMs = maintenantMs;
+  return s;
+}
+
+// Session qui attend depuis le plus récent changement, ou nullptr. Égalité d'instant : la dernière de la table.
+static const Session* attenteLaPlusRecente() {
+  const Session* res = nullptr;
+  for (const Session& s : sessions)
+    if (s.utilisee && s.etat == CLAUDE_ATTEND && (res == nullptr || s.changementMs >= res->changementMs)) res = &s;
+  return res;
+}
+
 // Anti-rebond du Bouton
 static bool boutonEnfonce = false;
 static bool boutonChangement = false;  // un changement accepté a déjà eu lieu
@@ -125,9 +164,11 @@ static void jeu(unsigned long maintenantMs) {
   strcpy(etat.texte, jeuNom);
 }
 
-// Point de retour : Jeu s'il y a un Jeu courant, sinon le Repos.
+// Point de retour : interpelle (Session qui attend la plus récente) > Jeu > Repos.
 static void retour(unsigned long maintenantMs) {
-  if (jeuConnu) jeu(maintenantMs);
+  const Session* attente = attenteLaPlusRecente();
+  if (attente != nullptr) installer(EXPR_INTERPELLE, attente->texte, false, maintenantMs, 0);
+  else if (jeuConnu) jeu(maintenantMs);
   else repos();
 }
 
@@ -146,7 +187,8 @@ void etatInit(bool boutonEnfonceAuDemarrage) {
   morceauConnu = false;
   morceauEnPause = false;
   jeuConnu = false;
-  boutonEnfonce = boutonEnfonceAuDemarrage;  // tenu au démarrage : pas de front d'appui
+  memset(sessions, 0, sizeof(sessions));
+  boutonEnfonce =boutonEnfonceAuDemarrage;  // tenu au démarrage : pas de front d'appui
   boutonChangement = false;
 }
 
@@ -185,12 +227,16 @@ unsigned long etatDureeMusique(const char* ligne1, const char* ligne2) {
 }
 
 static bool recevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
-                     const char* artiste) {
+                     const char* artiste, const char* session) {
   switch (type) {
-    case EV_CLAUDE_DONE:
+    case EV_CLAUDE_DONE: {
+      Session& s = sessionPour(session, maintenantMs);
+      s.etat = CLAUDE_FINI;
+      s.changementMs = maintenantMs;
       demarrerSon(SON_CLOCHETTE, maintenantMs);
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
+    }
     case EV_GIT_PUSH:
       installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
       demarrerSon(SON_FANFARE, maintenantMs);
@@ -219,18 +265,28 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       nouvellesMusiqueMs = maintenantMs;
       morceauEnPause = true;
       return false;
-    // Expression persistante : reste jusqu'au prochain Événement.
-    // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne
-    // (un claude_working d'une session peut effacer le claude_waiting d'une autre).
-    case EV_CLAUDE_WAITING:
-      installer(EXPR_INTERPELLE, texte, false, maintenantMs, 0);
+    // Persistante : la Session attend jusqu'à son propre claude_working ou claude_done.
+    case EV_CLAUDE_WAITING: {
+      Session& s = sessionPour(session, maintenantMs);
+      s.etat = CLAUDE_ATTEND;
+      s.changementMs = maintenantMs;
+      strncpy(s.texte, texte == nullptr ? "" : texte, sizeof(s.texte) - 1);
+      s.texte[sizeof(s.texte) - 1] = '\0';
+      installer(EXPR_INTERPELLE, s.texte, false, maintenantMs, 0);
       demarrerSon(SON_CARILLON, maintenantMs);
       return true;
-    // Ramène au Repos seulement si on attend ; sinon sans effet (l'API répond quand même 200).
-    case EV_CLAUDE_WORKING:
-      if (etat.expression != EXPR_INTERPELLE) return false;
+    }
+    // Change l'affichage seulement si c'est la Session affichée qui reprend ; passe alors au point
+    // de retour (autre Session qui attend, Jeu, Repos), sans carillon. Sinon sans effet (l'API répond 200).
+    case EV_CLAUDE_WORKING: {
+      Session& s = sessionPour(session, maintenantMs);
+      bool affichee = s.etat == CLAUDE_ATTEND && attenteLaPlusRecente() == &s;
+      s.etat = CLAUDE_TRAVAILLE;
+      s.changementMs = maintenantMs;
+      if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
       retour(maintenantMs);
       return true;
+    }
     // Ne changent que le point de retour ; Jeu ne s'affiche tout de suite qu'au Repos (ou sur place).
     case EV_GAME: {
       char nom[TEXTE_MAX + 1];
@@ -253,8 +309,8 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
 
 // Un Événement qui change l'Expression met fin au Rappel ; sans effet (false), il ne l'interrompt pas.
 bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
-                  const char* artiste) {
-  bool change = recevoir(type, texte, maintenantMs, artiste);
+                  const char* artiste, const char* session) {
+  bool change = recevoir(type, texte, maintenantMs, artiste, session);
   if (type == EV_GAME || type == EV_GAME_STOP) return change && !rappelActif;  // le Rappel continue
   if (change) rappelActif = false;
   return change;
