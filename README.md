@@ -37,7 +37,8 @@ everyday, and **the Mascot**, Claude Code's pixel-art critter, for everything Cl
 ## How it behaves
 
 - **Fallback screen**: when nothing else is showing, the companion returns to *Waiting* if a Claude
-  session waits for you, otherwise *Gaming* if a game runs, otherwise *Idle*.
+  session waits for you, otherwise *Gaming* if a game runs, otherwise *Idle*. After 2 minutes with no
+  event at all, it falls asleep (eyes closed, rising "z"s) and *Asleep* replaces *Idle* until the next event.
 - **Temporary screens** (Done, Music, Push) show for a few seconds, then return to the fallback.
 - **Two buttons** show a quick reminder on top of the current screen, silently: the **music button**
   shows the current track (or *No music*), the **Claude button** shows the most urgent session

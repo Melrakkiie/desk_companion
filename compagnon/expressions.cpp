@@ -79,6 +79,21 @@ static void dessinerRepos(const EtatCourant& e, unsigned long maintenantMs) {
   bouleSourire(0);
 }
 
+// Endormi : yeux fermés (deux traits, jamais de clignement), bouche en « o », des « z » montent lentement.
+static void dessinerEndormi(const EtatCourant& e, unsigned long maintenantMs) {
+  (void)e;
+  bouleCorps(0);
+  bouleYeux(0, true);
+  bouleBoucheO(0);
+  const unsigned long CYCLE_MS = 4000;  // un « z » met 4 s à monter ; trois « z » décalés
+  const int BAS = ZONE_VISAGE_Y + ZONE_VISAGE_HAUTEUR - 14, HAUT = ZONE_VISAGE_Y;
+  for (int i = 0; i < 3; i++) {
+    unsigned long p = (maintenantMs + i * (CYCLE_MS / 3)) % CYCLE_MS;
+    ecran.setCursor(BOULE_X + 22 + (int)(p / 400) * 2, BAS - (int)((BAS - HAUT) * p / CYCLE_MS));
+    ecran.print('z');
+  }
+}
+
 // Mascotte Claude (toutes les Expressions Claude) : sprite pixel-art de 16 x 10 cases de M px.
 // Corps 12 x 8 cases, bras de 2 cases de chaque côté (rangées 4-5), quatre pattes de 2 cases.
 static const int M = 4;
@@ -265,8 +280,9 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
     case EXPR_SILENCE:    dessinerSilence(e, maintenantMs); break;
     case EXPR_SANS_CLAUDE: dessinerSansClaude(e, maintenantMs); break;
     case EXPR_TRAVAILLE:  dessinerTravaille(e, maintenantMs); break;
+    case EXPR_ENDORMI:    dessinerEndormi(e, maintenantMs); break;
     case EXPR_REPOS:
-    default:             dessinerRepos(e, maintenantMs); break;
+    default:            dessinerRepos(e, maintenantMs); break;
   }
 
   ecran.display();
