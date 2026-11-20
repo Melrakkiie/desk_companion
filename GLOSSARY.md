@@ -2,6 +2,12 @@
 
 **Compagnon** : le petit appareil posé sur le bureau (ESP32 + écran) qui réagit à ce qui se passe sur le PC.
 
+**PC** : un ordinateur qui envoie des Événements au Compagnon. Il peut y en avoir plusieurs ; le Compagnon ne sait pas lequel envoie quoi.
+_À éviter_ : poste, machine.
+
+**Sommeil** : l'état du Compagnon quand aucun PC ne donne plus de nouvelles (tous éteints). Il s'endort après 2 min sans aucun Événement, quel qu'en soit le type, et seulement tant que son Wi-Fi est connecté : un Compagnon sans Wi-Fi n'entend plus rien mais ne dort pas, et les 2 min repartent de zéro au retour du Wi-Fi. Ce sont les rappels de lecture et de jeu, envoyés toutes les 10 s, qui prouvent qu'un PC est allumé ; un PC qui n'envoie que des Événements Claude peut endormir le Compagnon à tort pendant une longue tâche. Ni l'endormissement ni le réveil ne jouent de Son. En s'endormant, il oublie toutes les Sessions. N'importe quel Événement le réveille ; un appui sur un Bouton, non.
+_À éviter_ : veille, hors ligne, PC éteint.
+
 **Événement** : un message envoyé au Compagnon pour lui signaler quelque chose. Il porte un _type_ (ce qui s'est passé) et un _texte_ facultatif (le détail à afficher). Les Événements Claude portent aussi leur Session.
 _À éviter_ : notification, commande, message.
 
@@ -17,7 +23,9 @@ _À éviter_ : bip, alarme, notification.
 
 **Repos** : l'Expression par défaut, quand rien ne se passe, qu'aucune Session n'attend et qu'il n'y a pas de Jeu courant : la Boule qui sourit et cligne des yeux de temps en temps.
 
-**Boule** : la petite mascotte toute ronde du Compagnon (corps rond, antenne à pompon, yeux et bouche en noir sur le corps). Toutes les Expressions qui ne concernent pas Claude (Repos, Jeu, musique, Silence, push) en sont une variation ; les Expressions Claude montrent la Mascotte.
+**Endormi** : le point de retour pendant le Sommeil ; il prend la place du Repos. Boule aux yeux fermés (deux traits), bouche en petit « o », des « z » qui montent lentement dans la Zone visage ; Bandeau vide. Le Rappel musique y montre Endormi avec « Gros dodo temps » dans le Bandeau, à la place de Silence.
+
+**Boule** : la petite mascotte toute ronde du Compagnon (corps rond, antenne à pompon, yeux et bouche en noir sur le corps). Toutes les Expressions qui ne concernent pas Claude (Repos, Endormi, Jeu, musique, Silence, push) en sont une variation ; les Expressions Claude montrent la Mascotte.
 _À éviter_ : visage, mascotte (réservé à celle de Claude).
 
 **Jeu** : le point de retour tant qu'il y a un Jeu courant et qu'aucune Session n'attend ; elle prend la place du Repos. Boule concentrée qui cligne des yeux, une manette dans la Zone visage, le nom du jeu dans le Bandeau.
@@ -26,14 +34,14 @@ _À éviter_ : gaming, mode jeu.
 **Jeu courant** : le jeu lancé sur le PC par Steam ou Lutris, tant qu'il tourne. Le client Steam ou Lutris ouvert sans jeu n'en est pas un. Le PC rappelle l'état toutes les 10 s ; sans nouvelles pendant 30 s, il n'y a plus de Jeu courant.
 _À éviter_ : partie, jeu en cours.
 
-**Point de retour** : l'Expression vers laquelle le Compagnon revient quand rien d'autre n'est à montrer, par ordre de priorité : interpelle si au moins une Session attend (celle qui attend depuis le plus récemment), sinon Jeu s'il y a un Jeu courant, sinon le Repos. Ce n'est ni une Expression temporaire ni une Expression persistante.
+**Point de retour** : l'Expression vers laquelle le Compagnon revient quand rien d'autre n'est à montrer, par ordre de priorité : interpelle si au moins une Session attend (celle qui attend depuis le plus récemment), sinon Jeu s'il y a un Jeu courant, sinon Endormi pendant le Sommeil, sinon le Repos. Ce n'est ni une Expression temporaire ni une Expression persistante.
 
 **Expression temporaire** : une Expression qui revient d'elle-même au point de retour après une durée propre à son type.
 
 **Bouton** : un des deux boutons physiques du Compagnon, le **Bouton musique** ou le **Bouton Claude**. Un appui montre un Rappel. Un appui n'est pas un Événement : il ne vient pas du PC.
 _À éviter_ : touche, interrupteur.
 
-**Rappel** : ce que montre un appui sur un Bouton, par-dessus l'Expression courante sans la remplacer, pendant une durée propre à son type et sans Son. Le **Rappel musique** (Bouton musique) montre l'Expression musique du Morceau courant, ou Silence s'il n'y en a pas. Le **Rappel Claude** (Bouton Claude) montre l'État Claude le plus urgent. À la fin du Rappel, le Compagnon revient à l'Expression courante. Un nouvel appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
+**Rappel** : ce que montre un appui sur un Bouton, par-dessus l'Expression courante sans la remplacer, pendant une durée propre à son type et sans Son. Le **Rappel musique** (Bouton musique) montre l'Expression musique du Morceau courant, ou Silence s'il n'y en a pas (Endormi pendant le Sommeil). Le **Rappel Claude** (Bouton Claude) montre l'État Claude le plus urgent. À la fin du Rappel, le Compagnon revient à l'Expression courante. Un nouvel appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
 _À éviter_ : popup, superposition, aperçu.
 
 **Morceau courant** : le dernier morceau annoncé par `music`, tant que la lecture n'a pas été mise en pause ou arrêtée (`music_stop`). Il n'y en a pas toujours. Un morceau mis en pause reste connu du Compagnon : s'il reprend, il redevient Morceau courant sans être réaffiché. Le PC rappelle l'état de lecture toutes les 10 s ; sans nouvelles pendant 30 s, il n'y a plus de Morceau courant.
