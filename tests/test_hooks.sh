@@ -38,6 +38,9 @@ verifie() {
 verifie "Stop -> claude_done" \
   '{"hook_event_name":"Stop","session_id":"s1","cwd":"/home/a/Projects/mon_projet"}' \
   '/event application/json {"type":"claude_done","text":"mon_projet","session":"s1"}'
+verifie "StopFailure (erreur d'API) -> claude_done" \
+  '{"hook_event_name":"StopFailure","session_id":"s1","cwd":"/home/a/Projects/mon_projet"}' \
+  '/event application/json {"type":"claude_done","text":"mon_projet","session":"s1"}'
 verifie "Notification autorisation -> claude_waiting" \
   '{"hook_event_name":"Notification","notification_type":"permission_prompt","session_id":"s1","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_waiting","text":"autorisation ?\nmon_projet","session":"s1"}'

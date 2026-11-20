@@ -23,6 +23,11 @@ curl -X POST -H 'Content-Type: application/json' -d '{"type":"music","text":"Tit
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"git_push","text":"main"}' http://compagnon.local/event
 ```
 
+`Stop` et `StopFailure` (tour fini sur une erreur d'API) envoient `claude_done` ; seule la notification
+`permission_prompt` envoie `claude_waiting` (`idle_prompt`, « saisie inactive depuis ~60 s », est ignorée :
+elle arrive aussi quand la Session n'attend rien). Limite connue : une interruption (Échap) ne déclenche aucun
+hook, la Session reste « travaille » jusqu'à son prochain Événement.
+
 Les Événements Claude portent le `session_id` du hook dans `session` (chaîne, facultatif : absent = Session anonyme) ; le Compagnon suit l'attente de chaque Session séparément.
 
 Le hook `SessionEnd` envoie `claude_end` (avec `session`) : le Compagnon oublie la Session fermée ; si elle

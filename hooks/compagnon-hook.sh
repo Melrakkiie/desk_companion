@@ -14,7 +14,7 @@ champ() { printf '%s' "$entree" | jq -r "$1 // empty" 2>/dev/null; }
 
 projet=$(basename "$(champ .cwd)")
 case "$(champ .hook_event_name)" in
-  Stop) type=claude_done; texte=$projet ;;
+  Stop | StopFailure) type=claude_done; texte=$projet ;;  # StopFailure : tour fini sur une erreur d'API
   Notification)
     type=claude_waiting
     case "$(champ .notification_type)" in
