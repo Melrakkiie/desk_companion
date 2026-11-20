@@ -16,6 +16,9 @@ const unsigned long DUREE_RAPPEL_CLAUDE_MS = 3000;
 const unsigned long OUBLI_MORCEAU_MS = 30000;
 // Même principe pour le Jeu courant : le PC renvoie game ou game_stop toutes les 10 s (hors module).
 const unsigned long OUBLI_JEU_MS = 30000;
+// Session sans aucun Événement depuis 12 h : oubliée comme sur claude_end (Session tuée sans SessionEnd,
+// ou claude_end perdu). Une Session ouverte mais muette aussi longtemps revient à son prochain Événement.
+const unsigned long OUBLI_SESSION_MS = 12UL * 60 * 60 * 1000;
 const unsigned long ANTI_REBOND_MS = 50;  // Bouton : changements de niveau ignorés après un changement accepté
 const unsigned long PERIODE_ANIM_MS = 33;    // redessin périodique (~30 images/s)
 // Clignement du Repos : un par cycle, à un instant irrégulier du cycle.
