@@ -415,22 +415,25 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     etatVersCp437("pas de Claude", rappel.texte, TEXTE_MAX + 1);
     rappel.ligne2[0] = '\0';
   } else {
-    if (rappel.expression == EXPR_TRAVAILLE) {  // le texte d'une Session qui travaille est son projet : ligne 2
-      etatVersCp437("travaille", rappel.texte, TEXTE_MAX + 1);
+    if (rappel.expression != EXPR_INTERPELLE) {  // le texte d'une Session qui travaille ou a fini est son projet : ligne 2
+      etatVersCp437(rappel.expression == EXPR_TRAVAILLE ? "travaille" : "a fini", rappel.texte, TEXTE_MAX + 1);
       etatVersCp437(s->texte, rappel.ligne2, TEXTE_MAX + 1);
     } else {
       lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);
     }
     static_assert(SESSIONS_MAX <= 9, "« N sessions » doit tenir sur un chiffre (10 glyphes)");
     if (utilisees > 1 && utilisees <= 9) {  // borne redondante avec le static_assert, pour gcc
-      // « N sessions » au bord droit de la ligne 1 (bourrage d'espaces) ; trop long : à la suite, et la ligne défile
-      const int COMPTEUR = 10;                                 // strlen("N sessions")
+      // « │ N sessions » au bord droit de la ligne 1 (bourrage d'espaces) ; à l'étroit, sans l'espace après « │ » ;
+      // trop long : « │ N sessions » à la suite, et la ligne défile. « │ » = 0xB3 en CP437 (le « | » de la police est brisé).
       const int GLYPHES = LARGEUR_ECRAN_PX / LARGEUR_CHAR_PX;  // ligne pleine sans défilement
       int n = (int)strlen(rappel.texte);
-      if (n > TEXTE_MAX - COMPTEUR - 1) n = TEXTE_MAX - COMPTEUR - 1;
-      int debut = n + 1 + COMPTEUR <= GLYPHES ? GLYPHES - COMPTEUR : n + 1;
+      if (n > TEXTE_MAX - 13) n = TEXTE_MAX - 13;  // 13 = strlen(" │ N sessions")
+      int debut = n;
+      const char* format = " \xB3 %d sessions";
+      if (n + 12 <= GLYPHES) { debut = GLYPHES - 12; format = "\xB3 %d sessions"; }
+      else if (n + 11 <= GLYPHES) format = "\xB3%d sessions";
       memset(rappel.texte + n, ' ', debut - n);
-      snprintf(rappel.texte + debut, COMPTEUR + 1, "%d sessions", utilisees);
+      snprintf(rappel.texte + debut, 14, format, utilisees);
     }
   }
   rappel.dureeMs = DUREE_RAPPEL_CLAUDE_MS;
