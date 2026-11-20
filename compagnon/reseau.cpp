@@ -22,6 +22,7 @@ static void lancerTentative() {
 void reseauInit() {
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(false);  // c'est ce module qui gère les nouvelles tentatives
+  WiFi.setSleep(false);          // modem sleep coupé : réponses 0,3 s sinon ; le Compagnon est sur secteur
   lancerTentative();
 }
 

@@ -39,9 +39,10 @@ question qui t'est adressée, sinon `claude_done`. Critères, un seul suffit :
 
 Texte absent ou vide : `claude_done`. Limite : pas d'analyse du sens, donc un `?` final qui ne demande rien
 donne un faux « Hey? » (rare ; l'attente s'efface à ta prochaine saisie).
-`Stop`, `StopFailure` et `SessionEnd` envoient en attendant la réponse (au plus 1 s) : détaché, le `claude_done`
-du `Stop` n'arrivait pas (processus des hooks vraisemblablement tués à la fin du tour). Tous les autres
-Événements partent détachés, sans attente.
+Le script attend la réponse du Compagnon : au plus 3 s pour `Stop` et `StopFailure`, 1 s pour tous les autres
+Événements (`SessionEnd` compris). Détachés, le `claude_done` du `Stop` et un `claude_waiting` se perdaient
+(processus des hooks vraisemblablement tués à la sortie de Claude Code, Compagnon lent). Seul le `PostToolUse`
+d'un outil ordinaire (dizaines par minute, autre qu'`AskUserQuestion`) part détaché, sans attente.
 
 `claude_waiting` (« Hey? » puis le projet) part aussi dans ces cas : notification `permission_prompt`
 (autorisation), notification `elicitation_dialog` (saisie demandée par un serveur MCP), et `PreToolUse` de
