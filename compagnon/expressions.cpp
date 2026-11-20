@@ -127,6 +127,25 @@ static void dessinerSansClaude(const EtatCourant& e, unsigned long maintenantMs)
   dessinerRepos(e, maintenantMs);
 }
 
+// Travaille (Rappel Claude) : yeux plissés, sourcils froncés, bouche droite, trois points qui tournent
+static void dessinerTravaille(const EtatCourant& e, unsigned long maintenantMs) {
+  for (int d = 0; d < 2; d++) {  // sourcils froncés
+    ecran.drawLine(30, CENTRE_Y - 17 + d, 48, CENTRE_Y - 12 + d, SSD1306_WHITE);
+    ecran.drawLine(80, CENTRE_Y - 12 + d, 98, CENTRE_Y - 17 + d, SSD1306_WHITE);
+  }
+  ecran.fillRect(33, CENTRE_Y - 8, 15, 4, SSD1306_WHITE);  // yeux plissés
+  ecran.fillRect(81, CENTRE_Y - 8, 15, 4, SSD1306_WHITE);
+  ecran.drawFastHLine(52, CENTRE_Y + 14, 24, SSD1306_WHITE);
+  // Trois points sur un cercle de rayon 6, centré sous les yeux ; un quart de tour par PERIODE_ANIM_MS * 8
+  int quart = ((maintenantMs - e.debutMs) / (PERIODE_ANIM_MS * 8)) % 4;
+  static const int DX[4] = {6, 0, -6, 0};
+  static const int DY[4] = {0, 6, 0, -6};
+  for (int i = 0; i < 3; i++) {
+    int k = (quart + i) % 4;
+    ecran.fillCircle(64 + DX[k], CENTRE_Y + 4 + DY[k], 1, SSD1306_WHITE);
+  }
+}
+
 // git_push : yeux qui regardent vers le haut (pupilles en haut) et flèche qui monte entre eux
 static void dessinerPush(const EtatCourant& e, unsigned long maintenantMs) {
   const int yeuxY = CENTRE_Y - 6;
@@ -161,6 +180,7 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
     case EXPR_JEU:        dessinerJeu(e, maintenantMs); break;
     case EXPR_SILENCE:    dessinerSilence(e, maintenantMs); break;
     case EXPR_SANS_CLAUDE: dessinerSansClaude(e, maintenantMs); break;
+    case EXPR_TRAVAILLE:  dessinerTravaille(e, maintenantMs); break;
     case EXPR_REPOS:
     default:             dessinerRepos(e, maintenantMs); break;
   }

@@ -83,7 +83,8 @@ enum Expression {
   EXPR_PUSH,        // git_push (ticket #9)
   EXPR_JEU,         // Jeu courant : point de retour à la place du Repos
   EXPR_SILENCE,     // Rappel sans Morceau courant : jamais issue d'un Événement
-  EXPR_SANS_CLAUDE  // Rappel Claude sans Session connue : jamais issue d'un Événement
+  EXPR_SANS_CLAUDE, // Rappel Claude sans Session connue : jamais issue d'un Événement
+  EXPR_TRAVAILLE    // Rappel Claude d'une Session qui travaille : jamais issue d'un Événement
 };
 
 struct EtatCourant {
