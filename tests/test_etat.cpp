@@ -604,7 +604,7 @@ static void test_rappel_silence_sans_music() {
   etatInit();
   assert(etatBouton(true, 1000));
   assert(etatCourant().expression == EXPR_SILENCE);
-  assert(strcmp(etatCourant().texte, "pas de musique") == 0);
+  assert(strcmp(etatCourant().texte, "Silence radio") == 0);
   assert(etatCourant().ligne2[0] == '\0');
   assert(etatSonCourant() == SON_AUCUN);
   assert(!etatMiseAJour(3999));
