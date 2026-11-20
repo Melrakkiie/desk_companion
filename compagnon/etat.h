@@ -19,6 +19,9 @@ const unsigned long OUBLI_JEU_MS = 30000;
 // Session sans aucun Événement depuis 12 h : oubliée comme sur claude_end (Session tuée sans SessionEnd,
 // ou claude_end perdu). Une Session ouverte mais muette aussi longtemps revient à son prochain Événement.
 const unsigned long OUBLI_SESSION_MS = 12UL * 60 * 60 * 1000;
+// Sommeil : sans aucun Événement (de n'importe quel type) pendant ce délai, le Compagnon oublie
+// toutes les Sessions et son point de retour devient Endormi.
+const unsigned long DELAI_SOMMEIL_MS = 2UL * 60 * 1000;
 const unsigned long ANTI_REBOND_MS = 50;  // Bouton : changements de niveau ignorés après un changement accepté
 const unsigned long PERIODE_ANIM_MS = 33;    // redessin périodique (~30 images/s)
 // Clignement du Repos : un par cycle, à un instant irrégulier du cycle.
@@ -87,7 +90,8 @@ enum Expression {
   EXPR_JEU,         // Jeu courant : point de retour à la place du Repos
   EXPR_SILENCE,     // Rappel sans Morceau courant : jamais issue d'un Événement
   EXPR_SANS_CLAUDE, // Rappel Claude sans Session connue : jamais issue d'un Événement
-  EXPR_TRAVAILLE    // Rappel Claude d'une Session qui travaille : jamais issue d'un Événement
+  EXPR_TRAVAILLE,   // Rappel Claude d'une Session qui travaille : jamais issue d'un Événement
+  EXPR_ENDORMI      // point de retour pendant le Sommeil : jamais issue d'un Événement
 };
 
 struct EtatCourant {
@@ -140,7 +144,7 @@ bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenan
                   const char* artiste = nullptr, const char* session = nullptr);
 
 // À appeler à chaque tour de loop() : renvoie vrai si l'Expression a changé (retour au Repos).
-bool etatMiseAJour(unsigned long maintenantMs);
+bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte = true);
 
 // Bouton : à appeler à chaque tour de loop() avec le niveau brut (vrai = enfoncé) et l'heure.
 // Anti-rebond et front d'appui sont ici. L'enfoncement montre un Rappel (musique du Morceau

@@ -3,6 +3,13 @@
 `compagnon-hook.sh` envoie l'Événement au Compagnon (`claude_done`, `claude_waiting`, `claude_working`).
 Dépendances : `jq`, `curl`. Cible : `http://compagnon.local`, ou la variable `COMPAGNON_URL`.
 
+## Sommeil et signe de vie
+
+Sans aucun Événement pendant 2 min, le Compagnon s'endort (Endormi) et oublie toutes les Sessions Claude.
+Les services musique et jeu renvoient leur état toutes les 10 s : ils servent de signe de vie au Compagnon.
+Un PC sans ces services (seulement les hooks Claude) peut donc l'endormir à tort pendant une longue tâche Claude.
+Le prochain Événement le réveille.
+
 ## Installation
 
 Ajouter les entrées de `settings-extrait.json` sous la clé `hooks` de `~/.claude/settings.json`, **à côté**

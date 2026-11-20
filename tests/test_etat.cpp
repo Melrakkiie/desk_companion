@@ -296,12 +296,16 @@ static void test_music_duree_avec_deux_lignes_dans_le_texte() {
   assert(etatCourant().dureeMs == 2 * p && p * 2 > DUREE_MUSIC_MS);
 }
 
+// Signe de vie du PC (music_stop) : empêche le Sommeil sans toucher aux Sessions.
+static void signe_de_vie(unsigned long ms) { etatRecevoir(EV_MUSIC_STOP, nullptr, ms); }
+
 static void test_waiting_persistante_ne_revient_jamais_seule() {
   etatInit();
   assert(etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?", 100));
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
   assert(!etatCourant().temporaire);
+  signe_de_vie(100 + OUBLI_SESSION_MS - 2);
   assert(!etatMiseAJour(100 + OUBLI_SESSION_MS - 1));  // seul l'oubli des Sessions muettes (12 h) y met fin
   assert(etatCourant().expression == EXPR_INTERPELLE);
 }
@@ -540,8 +544,8 @@ static void test_oubli_apres_30s_sans_nouvelles() {
   assert(etatBouton(true, OUBLI_MORCEAU_MS - 1));  // 1 ms avant l'oubli : encore le morceau
   assert(etatCourant().expression == EXPR_MUSIQUE);
   etatBouton(false, OUBLI_MORCEAU_MS + 100);
-  etatMiseAJour(OUBLI_MORCEAU_MS + 100000);  // fin du Rappel
-  assert(etatBouton(true, OUBLI_MORCEAU_MS + 200000));  // plus de nouvelles depuis longtemps
+  etatMiseAJour(OUBLI_MORCEAU_MS + 10000);  // fin du Rappel
+  assert(etatBouton(true, OUBLI_MORCEAU_MS + 20000));  // plus de nouvelles depuis longtemps
   assert(etatCourant().expression == EXPR_SILENCE);
 }
 
@@ -811,12 +815,16 @@ static void test_session_muette_12h_est_oubliee() {
   etatInit();
   etatRecevoir(EV_CLAUDE_DONE, "fantome", 0, nullptr, "f");
   etatRecevoir(EV_CLAUDE_WAITING, "A", 1000, nullptr, "a");
+  signe_de_vie(OUBLI_SESSION_MS - 2);
   assert(!etatMiseAJour(OUBLI_SESSION_MS - 1));  // f encore connue
+  signe_de_vie(OUBLI_SESSION_MS - 1);
   assert(!etatMiseAJour(OUBLI_SESSION_MS));      // f oubliée, l'affichage (A) ne change pas
   etatBoutonClaude(true, OUBLI_SESSION_MS + 1);
   assert(strcmp(etatCourant().texte, "A") == 0);  // plus de « +1 »
   etatBoutonClaude(false, OUBLI_SESSION_MS + 100);
+  signe_de_vie(OUBLI_SESSION_MS + 500);
   assert(!etatMiseAJour(OUBLI_SESSION_MS + 1000));  // A oubliée sous le Rappel : pas encore visible
+  signe_de_vie(OUBLI_SESSION_MS + 2000);
   assert(etatMiseAJour(OUBLI_SESSION_MS + 1 + DUREE_RAPPEL_CLAUDE_MS));  // fin du Rappel : le Repos
   assert(etatCourant().expression == EXPR_REPOS);
 }
@@ -824,6 +832,7 @@ static void test_session_muette_12h_est_oubliee() {
 static void test_session_affichee_muette_12h_retour_au_repos() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  signe_de_vie(OUBLI_SESSION_MS - 1);
   assert(etatMiseAJour(OUBLI_SESSION_MS));
   assert(etatCourant().expression == EXPR_REPOS);
 }
@@ -878,6 +887,7 @@ static void test_attente_ne_disparait_pas_avec_le_temps_meme_a_plusieurs() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
   etatRecevoir(EV_CLAUDE_WAITING, "B", 10, nullptr, "b");
+  signe_de_vie(OUBLI_SESSION_MS - 2);
   etatMiseAJour(OUBLI_SESSION_MS - 1);  // juste avant l'oubli des Sessions muettes
   assert(strcmp(etatCourant().texte, "B") == 0);
   etatRecevoir(EV_CLAUDE_END, nullptr, OUBLI_SESSION_MS - 1, nullptr, "b");
@@ -928,6 +938,143 @@ static void test_bouton_claude_travaille_avant_fini() {
   assert(etatCourant().expression == EXPR_TRAVAILLE);
   assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
   assert(etatCourant().dureeMs == 3000);
+}
+
+static void test_sommeil_a_2_min_pile_pas_avant() {
+  etatInit();
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS - 1));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatCourant().texte[0] == '\0' && etatCourant().ligne2[0] == '\0');
+  assert(!etatCourant().temporaire);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS + 1000));
+}
+
+static void test_pas_de_sommeil_sans_wifi() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS * 3, false);
+  assert(etatCourant().expression == EXPR_REPOS);
+  etatMiseAJour(DELAI_SOMMEIL_MS * 10, false);
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_wifi_perdu_pendant_le_sommeil_reveille_sur_repos() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS + 1000, false));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS + 2000, false));  // reste au Repos, pas de Sommeil sans Wi-Fi
+}
+
+static void test_sommeil_2_min_apres_le_retour_du_wifi() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS * 3, false);
+  etatMiseAJour(DELAI_SOMMEIL_MS * 3 + 1000);  // Wi-Fi de retour
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS * 4 + 999));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS * 4 + 1000));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+}
+
+static void test_evenements_reguliers_empechent_le_sommeil() {
+  etatInit();
+  for (unsigned long t = 10000; t <= 5 * DELAI_SOMMEIL_MS; t += 10000) {
+    etatRecevoir(EV_MUSIC_STOP, nullptr, t);
+    etatRecevoir(EV_GAME_STOP, nullptr, t + 1);
+    etatMiseAJour(t + 2);
+    assert(etatCourant().expression == EXPR_REPOS);
+  }
+}
+
+static void test_sommeil_oublie_les_sessions() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 1000, nullptr, "a");
+  assert(etatMiseAJour(1000 + DELAI_SOMMEIL_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatSonCourant() == SON_CARILLON);  // le carillon d'avant, aucun nouveau Son
+  etatBoutonClaude(true, 1000 + DELAI_SOMMEIL_MS + 100);
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  etatBoutonClaude(false, 1000 + DELAI_SOMMEIL_MS + 200);
+  assert(etatMiseAJour(1000 + DELAI_SOMMEIL_MS + 100 + DUREE_RAPPEL_CLAUDE_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);  // Endormi, plus l'attente de A
+}
+
+static void test_sommeil_pendant_un_rappel_retour_a_endormi() {
+  etatInit();
+  etatBouton(true, DELAI_SOMMEIL_MS - 100);  // Rappel silence en cours quand le Sommeil arrive
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS));  // Rappel visible : rien ne change à l'écran
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS - 100 + DUREE_SILENCE_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+}
+
+static void test_rappel_musique_pendant_le_sommeil_gros_dodo_temps() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  unsigned long t = DELAI_SOMMEIL_MS + 1000;
+  assert(etatBouton(true, t));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(strcmp(etatCourant().texte, "Gros dodo temps") == 0);
+  assert(etatCourant().ligne2[0] == '\0');
+  assert(etatCourant().temporaire);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(t + DUREE_SILENCE_MS - 1));
+  assert(strcmp(etatCourant().texte, "Gros dodo temps") == 0);
+  assert(etatMiseAJour(t + DUREE_SILENCE_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatCourant().texte[0] == '\0');
+  assert(etatSonCourant() == SON_AUCUN);
+  // l'appui n'a pas réveillé : le Sommeil continue
+  assert(!etatMiseAJour(t + DUREE_SILENCE_MS + 1000));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+}
+
+static void test_evenements_reveillent_et_s_appliquent() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatRecevoir(EV_MUSIC_STOP, nullptr, DELAI_SOMMEIL_MS + 1));
+  assert(etatCourant().expression == EXPR_REPOS);
+
+  etatMiseAJour(DELAI_SOMMEIL_MS * 2 + 1);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatRecevoir(EV_MUSIC, "titre", DELAI_SOMMEIL_MS * 2 + 2, "art"));
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+
+  etatMiseAJour(DELAI_SOMMEIL_MS * 4);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatRecevoir(EV_GAME, "Jeu", DELAI_SOMMEIL_MS * 4 + 1));
+  assert(etatCourant().expression == EXPR_JEU);
+
+  etatMiseAJour(DELAI_SOMMEIL_MS * 5 + 1);  // Jeu oublié puis Sommeil
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatRecevoir(EV_GAME, "Jeu", DELAI_SOMMEIL_MS * 5 + 1));
+  assert(etatRecevoir(EV_GAME_STOP, nullptr, DELAI_SOMMEIL_MS * 5 + 2));
+  assert(etatCourant().expression == EXPR_REPOS);
+
+  etatMiseAJour(DELAI_SOMMEIL_MS * 8);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "A", DELAI_SOMMEIL_MS * 8 + 1, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(etatSonCourant() == SON_CARILLON);
+}
+
+static void test_reveil_sans_son_et_bouton_ne_reveille_pas() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(etatBouton(true, DELAI_SOMMEIL_MS + 100));
+  etatBouton(false, DELAI_SOMMEIL_MS + 200);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS + 100 + DUREE_SILENCE_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);  // le Bouton n'a pas réveillé
+  assert(etatRecevoir(EV_MUSIC_STOP, nullptr, DELAI_SOMMEIL_MS + 5000));
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS + 5000 + DELAI_SOMMEIL_MS - 1));  // compte remis à zéro au réveil
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS + 5000 + DELAI_SOMMEIL_MS));
 }
 
 static void test_bouton_claude_attend_avant_travaille() {
@@ -1130,6 +1277,7 @@ int main() {
   test_music_stop_compte_comme_des_nouvelles();
   test_rappel_musique_puis_retour();
   test_rappel_silence_sans_music();
+  test_rappel_musique_pendant_le_sommeil_gros_dodo_temps();
   test_bouton_rebonds_et_maintien_un_seul_rappel();
   test_bouton_tenu_au_demarrage_sans_rappel();
   test_bouton_nouvel_appui_relance_le_rappel();
@@ -1150,6 +1298,15 @@ int main() {
   test_bouton_claude_attend_avant_travaille();
   test_bouton_claude_travaille_la_plus_recente();
   test_claude_working_hors_rappel_ne_change_rien();
+  test_sommeil_a_2_min_pile_pas_avant();
+  test_evenements_reguliers_empechent_le_sommeil();
+  test_sommeil_oublie_les_sessions();
+  test_sommeil_pendant_un_rappel_retour_a_endormi();
+  test_evenements_reveillent_et_s_appliquent();
+  test_reveil_sans_son_et_bouton_ne_reveille_pas();
+  test_pas_de_sommeil_sans_wifi();
+  test_wifi_perdu_pendant_le_sommeil_reveille_sur_repos();
+  test_sommeil_2_min_apres_le_retour_du_wifi();
   puts("Tous les tests passent.");
   return 0;
 }

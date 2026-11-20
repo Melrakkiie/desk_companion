@@ -23,6 +23,12 @@ static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
 static bool jeuConnu = false;
 static unsigned long nouvellesJeuMs = 0;  // dernier game reçu
 
+// Sommeil : instant du dernier Événement (tout type) ; endormi = point de retour Endormi ;
+// wifiPrecedent = état du Wi-Fi à la dernière mise à jour (pour repartir à zéro à son retour).
+static unsigned long dernierEvenementMs = 0;
+static bool endormi = false;
+static bool wifiPrecedent = true;
+
 // Table des Sessions Claude Code : identifiant, État Claude, texte brut du dernier Événement
 // (« libellé\nprojet »), instant du dernier changement. La Session anonyme a l'identifiant "".
 // Pleine, la plus ancienne (changementMs minimal) cède la place à une nouvelle Session.
@@ -205,6 +211,7 @@ static void retour(unsigned long maintenantMs) {
   const Session* attente = attenteLaPlusRecente();
   if (attente != nullptr) installer(EXPR_INTERPELLE, attente->texte, false, maintenantMs, 0);
   else if (jeuConnu) jeu(maintenantMs);
+  else if (endormi) installer(EXPR_ENDORMI, nullptr, false, maintenantMs, 0);
   else repos();
 }
 
@@ -233,6 +240,9 @@ void etatInit(bool boutonMusiqueEnfonceAuDemarrage, bool boutonClaudeEnfonceAuDe
   morceauConnu = false;
   morceauEnPause = false;
   jeuConnu = false;
+  endormi = false;
+  wifiPrecedent = true;
+  dernierEvenementMs = 0;
   memset(sessions, 0, sizeof(sessions));
   // tenu au démarrage : pas de front d'appui
   boutonMusique = {boutonMusiqueEnfonceAuDemarrage, false, 0};
@@ -358,21 +368,44 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
 // Un Événement qui change l'Expression met fin au Rappel ; sans effet (false), il ne l'interrompt pas.
 bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
                   const char* artiste, const char* session) {
-  bool change = recevoir(type, texte, maintenantMs, artiste, session);
+  // N'importe quel Événement remet le compte à zéro et réveille (sans Son) avant de s'appliquer.
+  dernierEvenementMs = maintenantMs;
+  bool reveil = endormi;
+  endormi = false;
+  if (etat.expression == EXPR_ENDORMI) repos();
+  bool change = recevoir(type, texte, maintenantMs, artiste, session) || (reveil && !rappelActif);
   if (type == EV_GAME || type == EV_GAME_STOP) return change && !rappelActif;  // le Rappel continue
   if (change) rappelActif = false;
   return change;
 }
 
-bool etatMiseAJour(unsigned long maintenantMs) {
+bool etatMiseAJour(unsigned long maintenantMs, bool wifiConnecte) {
   oublierSiPerime(maintenantMs);
   bool visible = false;
+  // Sans Wi-Fi le Compagnon n'entend rien : pas de Sommeil, et le compte repart au retour du Wi-Fi.
+  if (!wifiConnecte || !wifiPrecedent) dernierEvenementMs = maintenantMs;
+  wifiPrecedent = wifiConnecte;
+  if (!wifiConnecte && endormi) {  // le Wi-Fi tombe pendant le Sommeil : réveil sans Son, retour au point de retour
+    endormi = false;
+    if (!etat.temporaire) {
+      retour(maintenantMs);
+      visible = !rappelActif;
+    }
+  }
   if (jeuConnu && maintenantMs - nouvellesJeuMs >= OUBLI_JEU_MS) {  // même effet qu'un game_stop
     if (oublierJeu()) visible = !rappelActif;
   }
   for (Session& s : sessions)  // même effet qu'un claude_end (Session tuée sans SessionEnd)
     if (s.utilisee && maintenantMs - s.changementMs >= OUBLI_SESSION_MS && oublierSession(s, maintenantMs))
       visible = !rappelActif;
+  if (!endormi && maintenantMs - dernierEvenementMs >= DELAI_SOMMEIL_MS) {
+    endormi = true;  // avant l'oubli : le retour() d'une Session affichée donne alors Endormi
+    Expression expressionAvantSommeil = etat.expression;
+    for (Session& s : sessions)
+      if (s.utilisee) oublierSession(s, maintenantMs);
+    if (!etat.temporaire && etat.expression != EXPR_ENDORMI) retour(maintenantMs);  // une Expression temporaire finit sa durée
+    if (etat.expression != expressionAvantSommeil) visible = !rappelActif;
+  }
   if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
     rappelActif = false;
     visible = true;
@@ -391,8 +424,8 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
   if (morceauConnu && !morceauEnPause) {
     rappel = morceau;
   } else {
-    rappel.expression = EXPR_SILENCE;
-    etatVersCp437("pas de musique", rappel.texte, TEXTE_MAX + 1);
+    rappel.expression = endormi ? EXPR_ENDORMI : EXPR_SILENCE;
+    etatVersCp437(endormi ? "Gros dodo temps" : "pas de musique", rappel.texte, TEXTE_MAX + 1);
     rappel.ligne2[0] = '\0';
     rappel.dureeMs = DUREE_SILENCE_MS;
   }
