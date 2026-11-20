@@ -261,7 +261,7 @@ void etatInit(bool boutonMusiqueEnfonceAuDemarrage, bool boutonClaudeEnfonceAuDe
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
-  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop", "claude_end"};
+  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop", "claude_end", "video"};
   if (nom == nullptr) return false;
   for (unsigned i = 0; i < sizeof(NOMS) / sizeof(*NOMS); i++) {
     if (strcmp(nom, NOMS[i]) == 0) {
@@ -308,17 +308,20 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
       demarrerSon(SON_FANFARE, maintenantMs);
       return true;
-    case EV_MUSIC: {
-      // Même morceau que le connu (reprise après pause) : redevient courant, sans réaffichage.
+    case EV_MUSIC:
+    case EV_VIDEO: {
+      // Même chose que la connue (genre compris ; reprise après pause) : redevient courante, sans réaffichage.
+      const Expression genre = type == EV_VIDEO ? EXPR_VIDEO : EXPR_MUSIQUE;
       oublierSiPerime(maintenantMs);
       nouvellesMusiqueMs = maintenantMs;
       char l1[TEXTE_MAX + 1], l2[TEXTE_MAX + 1];
       lignesBandeau(texte, artiste, l1, l2);
-      if (morceauConnu && strcmp(l1, morceau.texte) == 0 && strcmp(l2, morceau.ligne2) == 0) {
+      if (morceauConnu && morceau.expression == genre && strcmp(l1, morceau.texte) == 0 &&
+          strcmp(l2, morceau.ligne2) == 0) {
         morceauEnPause = false;
         return false;
       }
-      installer(EXPR_MUSIQUE, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
+      installer(genre, texte, true, maintenantMs, DUREE_MUSIC_MS, artiste);
       // la durée dépend des textes tronqués réellement conservés
       etat.dureeMs = etatDureeMusique(etat.texte, etat.ligne2);
       morceau = etat;

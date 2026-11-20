@@ -201,6 +201,17 @@ static void dessinerMusique(const EtatCourant& e, unsigned long maintenantMs) {
   dessinerNote(112, CENTRE_Y - 6 + haut);
 }
 
+// video : la Boule, yeux grands ouverts (clignement périodique), fixe un petit écran avec un ▶
+// (titre et chaîne : voir le Bandeau)
+static void dessinerVideo(const EtatCourant& e, unsigned long maintenantMs) {
+  (void)e;
+  bouleCorps(0);
+  bouleYeux(0, etatYeuxFermes(maintenantMs));
+  bouleBoucheO(0);
+  ecran.drawRect(96, 26, 26, 22, SSD1306_WHITE);
+  ecran.fillTriangle(104, 31, 104, 43, 114, 37, SSD1306_WHITE);
+}
+
 // silence (Rappel sans Morceau courant) : la Boule bouche serrée, une note barrée à côté
 static void dessinerSilence(const EtatCourant& e, unsigned long maintenantMs) {
   (void)e;
@@ -275,6 +286,7 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
     case EXPR_CONTENT:    dessinerContent(e, maintenantMs); break;
     case EXPR_INTERPELLE: dessinerInterpelle(e, maintenantMs); break;
     case EXPR_MUSIQUE:    dessinerMusique(e, maintenantMs); break;
+    case EXPR_VIDEO:      dessinerVideo(e, maintenantMs); break;
     case EXPR_PUSH:       dessinerPush(e, maintenantMs); break;
     case EXPR_JEU:        dessinerJeu(e, maintenantMs); break;
     case EXPR_SILENCE:    dessinerSilence(e, maintenantMs); break;

@@ -78,7 +78,8 @@ enum TypeEvenement {
   EV_MUSIC_STOP,
   EV_GAME,       // texte = nom du jeu
   EV_GAME_STOP,
-  EV_CLAUDE_END  // SessionEnd : la Session est oubliée
+  EV_CLAUDE_END, // SessionEnd : la Session est oubliée
+  EV_VIDEO       // texte = titre, artiste = chaîne : la Vidéo courante (remplace le Morceau courant)
 };
 
 enum Expression {
@@ -91,7 +92,8 @@ enum Expression {
   EXPR_SILENCE,     // Rappel sans Morceau courant : jamais issue d'un Événement
   EXPR_SANS_CLAUDE, // Rappel Claude sans Session connue : jamais issue d'un Événement
   EXPR_TRAVAILLE,   // Rappel Claude d'une Session qui travaille : jamais issue d'un Événement
-  EXPR_ENDORMI      // point de retour pendant le Sommeil : jamais issue d'un Événement
+  EXPR_ENDORMI,     // point de retour pendant le Sommeil : jamais issue d'un Événement
+  EXPR_VIDEO        // video : temporaire, sans Son, durée de l'Expression musique
 };
 
 struct EtatCourant {
