@@ -20,11 +20,15 @@ case "$(champ .hook_event_name)" in
     type=claude_waiting
     case "$(champ .notification_type)" in
       # libellé sur la ligne 1 du Bandeau, projet sur la ligne 2 (saut de ligne dans le texte)
-      permission_prompt) texte="Hey?"$'\n'"$projet" ;;
+      # elicitation_dialog : un serveur MCP demande une saisie
+      permission_prompt | elicitation_dialog) texte="Hey?"$'\n'"$projet" ;;
       # idle_prompt (saisie inactive ~60 s après la fin) ne dit pas que la Session attend quelque chose :
       # ignoré comme les autres notifications.
       *) exit 0 ;;  # autres notifications : rien à signaler
     esac ;;
+  PreToolUse)  # question à choix ouverte : la Session attend ; PostToolUse efface l'attente
+    [ "$(champ .tool_name)" = AskUserQuestion ] || exit 0
+    type=claude_waiting; texte="Hey?"$'\n'"$projet" ;;
   UserPromptSubmit | PostToolUse) type=claude_working; texte=$projet ;;
   SessionEnd) type=claude_end; texte=$projet ;;  # la Session fermée n'est plus suivie
   *) exit 0 ;;
