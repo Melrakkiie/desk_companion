@@ -952,6 +952,81 @@ static void test_sommeil_a_2_min_pile_pas_avant() {
   assert(!etatMiseAJour(DELAI_SOMMEIL_MS + 1000));
 }
 
+static void test_evenements_reguliers_empechent_le_sommeil() {
+  etatInit();
+  for (unsigned long t = 10000; t <= 5 * DELAI_SOMMEIL_MS; t += 10000) {
+    etatRecevoir(EV_MUSIC_STOP, nullptr, t);
+    etatRecevoir(EV_GAME_STOP, nullptr, t + 1);
+    etatMiseAJour(t + 2);
+    assert(etatCourant().expression == EXPR_REPOS);
+  }
+}
+
+static void test_sommeil_oublie_les_sessions() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 1000, nullptr, "a");
+  assert(etatMiseAJour(1000 + DELAI_SOMMEIL_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatSonCourant() == SON_CARILLON);  // le carillon d'avant, aucun nouveau Son
+  etatBoutonClaude(true, 1000 + DELAI_SOMMEIL_MS + 100);
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  etatBoutonClaude(false, 1000 + DELAI_SOMMEIL_MS + 200);
+  assert(etatMiseAJour(1000 + DELAI_SOMMEIL_MS + 100 + DUREE_RAPPEL_CLAUDE_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);  // Endormi, plus l'attente de A
+}
+
+static void test_sommeil_pendant_un_rappel_retour_a_endormi() {
+  etatInit();
+  etatBouton(true, DELAI_SOMMEIL_MS - 100);  // Rappel silence en cours quand le Sommeil arrive
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS));  // Rappel visible : rien ne change à l'écran
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS - 100 + DUREE_SILENCE_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);
+}
+
+static void test_evenements_reveillent_et_s_appliquent() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatRecevoir(EV_MUSIC_STOP, nullptr, DELAI_SOMMEIL_MS + 1));
+  assert(etatCourant().expression == EXPR_REPOS);
+
+  etatMiseAJour(DELAI_SOMMEIL_MS * 2 + 1);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatRecevoir(EV_MUSIC, "titre", DELAI_SOMMEIL_MS * 2 + 2, "art"));
+  assert(etatCourant().expression == EXPR_MUSIQUE);
+
+  etatMiseAJour(DELAI_SOMMEIL_MS * 4);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatRecevoir(EV_GAME, "Jeu", DELAI_SOMMEIL_MS * 4 + 1));
+  assert(etatCourant().expression == EXPR_JEU);
+
+  etatMiseAJour(DELAI_SOMMEIL_MS * 5 + 1);  // Jeu oublié puis Sommeil
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatRecevoir(EV_GAME, "Jeu", DELAI_SOMMEIL_MS * 5 + 1));
+  assert(etatRecevoir(EV_GAME_STOP, nullptr, DELAI_SOMMEIL_MS * 5 + 2));
+  assert(etatCourant().expression == EXPR_REPOS);
+
+  etatMiseAJour(DELAI_SOMMEIL_MS * 8);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "A", DELAI_SOMMEIL_MS * 8 + 1, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(etatSonCourant() == SON_CARILLON);
+}
+
+static void test_reveil_sans_son_et_bouton_ne_reveille_pas() {
+  etatInit();
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(etatBouton(true, DELAI_SOMMEIL_MS + 100));
+  etatBouton(false, DELAI_SOMMEIL_MS + 200);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS + 100 + DUREE_SILENCE_MS));
+  assert(etatCourant().expression == EXPR_ENDORMI);  // le Bouton n'a pas réveillé
+  assert(etatRecevoir(EV_MUSIC_STOP, nullptr, DELAI_SOMMEIL_MS + 5000));
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(DELAI_SOMMEIL_MS + 5000 + DELAI_SOMMEIL_MS - 1));  // compte remis à zéro au réveil
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS + 5000 + DELAI_SOMMEIL_MS));
+}
+
 static void test_bouton_claude_attend_avant_travaille() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-a", 100, nullptr, "a");
@@ -1173,6 +1248,11 @@ int main() {
   test_bouton_claude_travaille_la_plus_recente();
   test_claude_working_hors_rappel_ne_change_rien();
   test_sommeil_a_2_min_pile_pas_avant();
+  test_evenements_reguliers_empechent_le_sommeil();
+  test_sommeil_oublie_les_sessions();
+  test_sommeil_pendant_un_rappel_retour_a_endormi();
+  test_evenements_reveillent_et_s_appliquent();
+  test_reveil_sans_son_et_bouton_ne_reveille_pas();
   puts("Tous les tests passent.");
   return 0;
 }
