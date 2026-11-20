@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Lecteur multimédia -> Compagnon. Suit `playerctl --follow metadata` (MPRIS) et envoie en POST /event
 # l'état de lecture : `video` (titre + chaîne) si l'adresse (xesam:url) est une vidéo, `music` (titre + artiste)
-# si un morceau joue, `music_stop` sinon (pause, arrêt,
-# sans titre, lecteur fermé). Envoi à chaque changement, puis renvoi de l'état courant toutes les 10 s :
+# si un morceau joue, `music_stop` sinon (pause, arrêt, sans titre,
+# lecteur fermé). Envoi à chaque changement, puis renvoi de l'état courant toutes les 10 s :
 # le Compagnon rattrape ainsi l'état réel après un redémarrage, un envoi perdu ou une cible injoignable,
 # et reconnaît lui-même un morceau déjà connu (le script ne garde aucune mémoire de ce qu'il a envoyé).
 # Tourne en arrière-plan, sans jamais s'arrêter ni bloquer, même si le Compagnon est injoignable.
