@@ -436,7 +436,7 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
     rappel = morceau;
   } else {
     rappel.expression = endormi ? EXPR_ENDORMI : EXPR_SILENCE;
-    etatVersCp437(endormi ? "Gros dodo temps" : "pas de musique", rappel.texte, TEXTE_MAX + 1);
+    etatVersCp437(endormi ? "Gros dodo temps" : "Silence radio", rappel.texte, TEXTE_MAX + 1);
     rappel.ligne2[0] = '\0';
     rappel.dureeMs = DUREE_SILENCE_MS;
   }
