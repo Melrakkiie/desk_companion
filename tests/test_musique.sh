@@ -124,4 +124,65 @@ arrete
 if [ "$(cat "$TMP/log3")" = "$(printf '%s\n' "$M1" "$STOP")" ]; then echo "ok   fin de la source : music_stop"
 else echo "ECHEC fin de source, reçu :"; cat "$TMP/log3"; echec=1; fi
 
+# Classement vidéo / morceau d'après l'adresse (4e champ) : un Événement par ligne.
+# ligne URL TYPE : chaque adresse jouée doit donner TYPE.
+{
+  ligne() { printf 'Playing%sChaîne%sTitre%s%s\n' "$S" "$S" "$S" "$1"; }
+  ligne 'https://www.youtube.com/watch?v=abc'
+  ligne 'https://m.youtube.com/watch?v=abc'
+  ligne 'https://youtu.be/abc'
+  ligne 'https://music.youtube.com/watch?v=abc'
+  ligne 'https://www.twitch.tv/chaine'
+  ligne 'https://www.netflix.com/watch/1'
+  ligne 'https://www.primevideo.com/detail/1'
+  ligne 'https://www.disneyplus.com/video/1'
+  ligne 'https://vimeo.com/1'
+  ligne 'https://www.dailymotion.com/video/1'
+  ligne 'https://www.crunchyroll.com/watch/1'
+  ligne 'https://notyoutube.com/watch'
+  ligne 'https://open.spotify.com/track/1'
+  ligne 'file:///home/a/film.mkv'
+  ligne 'file:///home/a/film.MP4'
+  ligne 'file:///home/a/film.webm'
+  ligne 'file:///home/a/film.avi'
+  ligne 'file:///home/a/film.mov'
+  ligne 'file:///home/a/film.m4v'
+  ligne 'file:///home/a/son.flac'
+  ligne ''
+} > "$TMP/urls"
+: > "$TMP/log7"
+serveur "$TMP/log7" "$TMP/port7"
+for _ in $(seq 50); do [ -s "$TMP/port7" ] && break; sleep 0.1; done
+COMPAGNON_URL=http://127.0.0.1:$(cat "$TMP/port7") COMPAGNON_MUSIQUE_RENVOI_S=30 COMPAGNON_MUSIQUE_SOURCE="cat $TMP/urls; sleep 30" lance
+attend "$TMP/log7" 21
+sleep 0.3
+arrete
+attendu=$(printf '%s\n' video video video music video video video video video video video music music \
+  video video video video video video music music)
+recu=$(sed -E 's/.*"type":"([a-z_]+)".*/\1/' "$TMP/log7")
+if [ "$recu" = "$attendu" ]; then echo "ok   classement vidéo/morceau d'après l'adresse"
+else echo "ECHEC classement, reçu :"; paste "$TMP/urls" "$TMP/log7" | cat -v; echec=1; fi
+
+# Vidéo : même forme que music (titre, chaîne en artist) ; pause : music_stop ; renvoi : video.
+printf 'Playing%sChaîne%sTitre%shttps://youtu.be/x\nPaused%sChaîne%sTitre%shttps://youtu.be/x\n' "$S" "$S" "$S" "$S" "$S" "$S" > "$TMP/vid"
+: > "$TMP/log8"
+serveur "$TMP/log8" "$TMP/port8"
+for _ in $(seq 50); do [ -s "$TMP/port8" ] && break; sleep 0.1; done
+COMPAGNON_URL=http://127.0.0.1:$(cat "$TMP/port8") COMPAGNON_MUSIQUE_RENVOI_S=30 COMPAGNON_MUSIQUE_SOURCE="cat $TMP/vid; sleep 30" lance
+attend "$TMP/log8" 2
+sleep 0.3
+arrete
+if [ "$(cat "$TMP/log8")" = "$(printf '%s\n' '/event application/json {"type":"video","text":"Titre","artist":"Chaîne"}' "$STOP")" ]; then echo "ok   vidéo : video puis music_stop à la pause"
+else echo "ECHEC vidéo, reçu :"; cat "$TMP/log8"; echec=1; fi
+
+printf 'Playing%sChaîne%sTitre%shttps://youtu.be/x\n' "$S" "$S" "$S" > "$TMP/vid1"
+: > "$TMP/log9"
+serveur "$TMP/log9" "$TMP/port9"
+for _ in $(seq 50); do [ -s "$TMP/port9" ] && break; sleep 0.1; done
+COMPAGNON_URL=http://127.0.0.1:$(cat "$TMP/port9") COMPAGNON_MUSIQUE_RENVOI_S=0.3 COMPAGNON_MUSIQUE_SOURCE="cat $TMP/vid1; sleep 30" lance
+attend "$TMP/log9" 4
+arrete
+if [ "$(sort -u "$TMP/log9")" = '/event application/json {"type":"video","text":"Titre","artist":"Chaîne"}' ]; then echo "ok   vidéo : video renvoyé périodiquement"
+else echo "ECHEC renvoi video, reçu :"; cat "$TMP/log9"; echec=1; fi
+
 exit $echec

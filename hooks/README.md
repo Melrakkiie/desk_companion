@@ -111,7 +111,13 @@ Limite : Linux uniquement (le script lit `/proc`), et seulement les clients qui 
 ## Musique (lecteur multimédia)
 
 `compagnon-musique.sh` suit `playerctl --follow metadata` et envoie l'état de lecture à chaque changement :
-`music` (titre, artiste) si un morceau joue, `music_stop` sinon (pause, arrêt, lecteur fermé). Il renvoie
+`music` (titre, artiste) si un morceau joue, `video` (titre, chaîne en `artist`) si ce qui joue est une vidéo,
+`music_stop` sinon (pause, arrêt, lecteur fermé). C'est l'adresse lue par `playerctl` (`xesam:url`) qui
+décide, avec une règle en dur dans le script : est une vidéo un hôte `youtube.com` (et ses sous-domaines,
+sauf `music.youtube.com`), `youtu.be`, `twitch.tv`, `netflix.com`, `primevideo.com`, `disneyplus.com`,
+`vimeo.com`, `dailymotion.com` ou `crunchyroll.com`, ou une adresse `file://` en `.mkv .mp4 .webm .avi .mov
+.m4v` (casse ignorée). Tout le reste, adresse vide comprise (lecteur qui n'en donne pas, Spotify), est un
+morceau ; un navigateur qui n'expose pas l'adresse garde donc ses vidéos classées en morceaux. Il renvoie
 aussi cet état toutes les 10 s (période réglable : `COMPAGNON_MUSIQUE_RENVOI_S`, en secondes ; la garder
 sous les 30 s au bout desquelles le Compagnon oublie le morceau) : c'est le Compagnon qui reconnaît un morceau
 déjà connu, donc ces renvois ne changent rien à l'écran. Si le Compagnon est injoignable, le script continue et
