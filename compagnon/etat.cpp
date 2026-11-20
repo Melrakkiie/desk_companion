@@ -312,6 +312,8 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       bool affichee = s.etat == CLAUDE_ATTEND && attenteLaPlusRecente() == &s;
       s.etat = CLAUDE_TRAVAILLE;
       s.changementMs = maintenantMs;
+      strncpy(s.texte, texte == nullptr ? "" : texte, sizeof(s.texte) - 1);  // pour le Rappel Claude, pas d'affichage direct
+      s.texte[sizeof(s.texte) - 1] = '\0';
       if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
       retour(maintenantMs);
       return true;
@@ -398,6 +400,7 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
 
   const Session* s = attenteLaPlusRecente();
   rappel.expression = EXPR_INTERPELLE;
+  if (s == nullptr) { s = laPlusRecente(CLAUDE_TRAVAILLE); rappel.expression = EXPR_TRAVAILLE; }
   if (s == nullptr) { s = laPlusRecente(CLAUDE_FINI); rappel.expression = EXPR_CONTENT; }
   int autres = -1;
   for (const Session& t : sessions) autres += t.utilisee;
@@ -406,7 +409,12 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     etatVersCp437("pas de Claude", rappel.texte, TEXTE_MAX + 1);
     rappel.ligne2[0] = '\0';
   } else {
-    lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);
+    if (rappel.expression == EXPR_TRAVAILLE) {  // le texte d'une Session qui travaille est son projet : ligne 2
+      etatVersCp437("travaille", rappel.texte, TEXTE_MAX + 1);
+      etatVersCp437(s->texte, rappel.ligne2, TEXTE_MAX + 1);
+    } else {
+      lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);
+    }
     if (autres > 0) {  // « +N » en fin de ligne 1 (N <= SESSIONS_MAX - 1 : un chiffre), sans dépasser TEXTE_MAX
       int n = (int)strlen(rappel.texte);
       if (n > TEXTE_MAX - 3) n = TEXTE_MAX - 3;

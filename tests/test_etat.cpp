@@ -895,6 +895,41 @@ static void test_bouton_claude_attend_la_plus_recente_avant_fini() {
   assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
 }
 
+static void test_bouton_claude_travaille_avant_fini() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 200, nullptr, "b");
+  etatMiseAJour(10000);
+  etatBoutonClaude(true, 11000);
+  assert(etatCourant().expression == EXPR_TRAVAILLE);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+  assert(etatCourant().dureeMs == 3000);
+}
+
+static void test_bouton_claude_attend_avant_travaille() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 200, nullptr, "b");
+  etatBoutonClaude(true, 1000);
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+}
+
+static void test_bouton_claude_travaille_la_plus_recente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 200, nullptr, "b");
+  etatBoutonClaude(true, 1000);
+  assert(etatCourant().expression == EXPR_TRAVAILLE);
+  assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
+}
+
+static void test_claude_working_hors_rappel_ne_change_rien() {
+  etatInit();
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "projet-a", 100, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
 static void test_bouton_claude_fini_content_de_la_plus_recente() {
   etatInit();
   etatRecevoir(EV_CLAUDE_DONE, "projet-a", 100, nullptr, "a");
@@ -913,9 +948,9 @@ static void test_bouton_claude_compteur_autres_sessions() {
   etatBoutonClaude(true, 1000);
   assert(strcmp(etatCourant().texte, "projet-a") == 0);  // une seule : pas de compteur
   etatBoutonClaude(false, 1100);
-  etatRecevoir(EV_CLAUDE_WORKING, "", 1200, nullptr, "b");
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 1200, nullptr, "b");
   etatBoutonClaude(true, 2000);
-  assert(strcmp(etatCourant().texte, "projet-a +1") == 0);
+  assert(strcmp(etatCourant().texte, "projet-b +1") == 0);
   etatBoutonClaude(false, 2100);
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-c", 2200, nullptr, "c");
   etatBoutonClaude(true, 3000);
@@ -1074,6 +1109,10 @@ int main() {
   test_boutons_anti_rebond_independants();
   test_bouton_claude_tenu_au_demarrage_sans_rappel();
   test_rappel_claude_evenement_qui_change_y_met_fin();
+  test_bouton_claude_travaille_avant_fini();
+  test_bouton_claude_attend_avant_travaille();
+  test_bouton_claude_travaille_la_plus_recente();
+  test_claude_working_hors_rappel_ne_change_rien();
   puts("Tous les tests passent.");
   return 0;
 }
