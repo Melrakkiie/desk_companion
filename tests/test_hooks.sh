@@ -47,6 +47,15 @@ verifie "Notification autorisation -> claude_waiting" \
 verifie "Notification idle_prompt (Session qui a fini) -> rien envoyé" \
   '{"hook_event_name":"Notification","notification_type":"idle_prompt","session_id":"s1","cwd":"/x/mon_projet"}' \
   ''
+verifie "PreToolUse AskUserQuestion -> claude_waiting" \
+  '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","session_id":"s1","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_waiting","text":"Hey?\nmon_projet","session":"s1"}'
+verifie "PreToolUse d'un autre outil -> rien envoyé" \
+  '{"hook_event_name":"PreToolUse","tool_name":"Bash","session_id":"s1","cwd":"/x/mon_projet"}' \
+  ''
+verifie "Notification elicitation_dialog -> claude_waiting" \
+  '{"hook_event_name":"Notification","notification_type":"elicitation_dialog","session_id":"s1","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_waiting","text":"Hey?\nmon_projet","session":"s1"}'
 verifie "Notification d'un autre type -> rien envoyé" \
   '{"hook_event_name":"Notification","notification_type":"auth_success","session_id":"s1","cwd":"/x/mon_projet"}' \
   ''
