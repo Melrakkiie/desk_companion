@@ -23,7 +23,10 @@ curl -X POST -H 'Content-Type: application/json' -d '{"type":"music","text":"Tit
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"git_push","text":"main"}' http://compagnon.local/event
 ```
 
-`Stop` et `StopFailure` (tour fini sur une erreur d'API) envoient `claude_done` ; seule la notification
+`Stop` et `StopFailure` (tour fini sur une erreur d'API) envoient `claude_done`. Pour ces Événements de fin
+et `claude_end`, le script attend la réponse (au plus 1 s) : envoyé détaché, le `claude_done` du `Stop` n'arrivait pas
+(processus des hooks vraisemblablement tués à la fin du tour). Les autres partent détachés, sans attente.
+Seule la notification
 `permission_prompt` envoie `claude_waiting` (`idle_prompt`, « saisie inactive depuis ~60 s », est ignorée :
 elle arrive aussi quand la Session n'attend rien). Limite connue : une interruption (Échap) ne déclenche aucun
 hook, la Session reste « travaille » jusqu'à son prochain Événement.
@@ -40,8 +43,8 @@ curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_end","text"
 ```
 
 Vérification de `SessionEnd` : documenté dans la référence des hooks de Claude Code (raisons `clear`, `resume`,
-`logout`, `prompt_input_exit`, `other` ; budget partagé de 1,5 s, que le script respecte en rendant la main
-tout de suite) et présent dans la version installée lors de l'écriture (2.1.329). Non vérifié en réel : le
+`logout`, `prompt_input_exit`, `other` ; budget partagé de 1,5 s, que le script respecte en
+attendant la réponse au plus 1 s) et présent dans la version installée lors de l'écriture (2.1.329). Non vérifié en réel : le
 déclenchement effectif sur une vraie Session fermée, ni le cas d'un processus tué (SIGKILL), où le hook ne
 peut pas s'exécuter, d'où la limite de 8 Sessions. À contrôler après installation : fermer une Session qui attend
 et voir l'interpellation disparaître.

@@ -63,11 +63,24 @@ verifie "Sans session_id -> pas de champ session" \
   '{"hook_event_name":"Stop","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_done","text":"mon_projet"}'
 
+# Fin de tour : la requête est déjà reçue quand le hook rend la main (Claude Code peut tuer
+# les processus des hooks à la fin du tour, un envoi détaché n'arriverait pas).
+for evt in Stop StopFailure SessionEnd; do
+  : > "$TMP/log"
+  printf '%s' "{\"hook_event_name\":\"$evt\",\"session_id\":\"s1\",\"cwd\":\"/x/p\"}" | bash "$HOOK"
+  if [ -s "$TMP/log" ]; then echo "ok   $evt envoyé avant de rendre la main"; else echo "ECHEC $evt : rien reçu au retour du hook"; echec=1; fi
+done
+
 # Cible injoignable : le script rend la main vite, code 0, sans rien écrire.
-debut=$(date +%s%N)
-printf '%s' '{"hook_event_name":"Stop","cwd":"/x/p"}' | COMPAGNON_URL=http://10.255.255.1 bash "$HOOK"
-code=$?
-ms=$(( ($(date +%s%N) - debut) / 1000000 ))
-if [ "$code" = 0 ] && [ "$ms" -lt 500 ]; then echo "ok   cible injoignable (${ms} ms)"; else echo "ECHEC cible injoignable : code $code, ${ms} ms"; echec=1; fi
+# temps_max_ms <nom> <événement> <limite en ms>
+temps_max_ms() {
+  debut=$(date +%s%N)
+  printf '%s' "{\"hook_event_name\":\"$2\",\"cwd\":\"/x/p\"}" | COMPAGNON_URL=http://10.255.255.1 bash "$HOOK"
+  code=$?
+  ms=$(( ($(date +%s%N) - debut) / 1000000 ))
+  if [ "$code" = 0 ] && [ "$ms" -lt "$3" ]; then echo "ok   $1 (${ms} ms)"; else echo "ECHEC $1 : code $code, ${ms} ms"; echec=1; fi
+}
+temps_max_ms "cible injoignable, PostToolUse détaché" PostToolUse 500
+temps_max_ms "cible injoignable, Stop borné à 1 s" Stop 1500
 
 exit $echec

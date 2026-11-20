@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Hook Claude Code -> Compagnon. Lit le JSON du hook sur l'entrée, envoie l'Événement
-# correspondant en POST /event, en arrière-plan, sans jamais échouer ni bloquer.
+# correspondant en POST /event, sans jamais échouer ; au plus 1 s d'attente (fin de tour), sinon aucune.
 #
 # Cible : http://compagnon.local, remplaçable par la variable COMPAGNON_URL (tests).
 # Le session_id du hook part dans le champ "session" : le Compagnon suit chaque Session
 # séparément (champ omis s'il est absent : Session anonyme).
 
 # Durée du hook, laissée ici (couche hook) plutôt que dans etat.h : voir le bloc de durées d'etat.h.
-delai_curl_s=2  # abandonne la requête après 2 s (le script, lui, rend la main tout de suite)
+delai_curl_s=2  # envoi détaché : abandonne la requête après 2 s (le script, lui, rend la main tout de suite)
+delai_fin_s=1   # fin de tour ou de Session : le script attend la réponse, au plus 1 s
 
 entree=$(cat)
 champ() { printf '%s' "$entree" | jq -r "$1 // empty" 2>/dev/null; }
@@ -33,7 +34,17 @@ session=$(champ .session_id)
 corps=$(jq -nc --arg type "$type" --arg text "$texte" --arg session "$session" \
   '{type: $type, text: $text} + (if $session == "" then {} else {session: $session} end)' 2>/dev/null) || exit 0
 
-# Tout détaché (sous-shell + &) pour rendre la main tout de suite, même si la cible est injoignable.
-( curl -s -o /dev/null --max-time "$delai_curl_s" -X POST -H 'Content-Type: application/json' \
-    -d "$corps" "${COMPAGNON_URL:-http://compagnon.local}/event" >/dev/null 2>&1 & ) >/dev/null 2>&1
+envoyer() {
+  curl -s -o /dev/null --max-time "$1" -X POST -H 'Content-Type: application/json' \
+    -d "$corps" "${COMPAGNON_URL:-http://compagnon.local}/event" >/dev/null 2>&1
+}
+
+case "$type" in
+  # Fin de tour ou de Session : envoyé détaché, le claude_done du Stop n'arrivait pas (processus
+  # des hooks vraisemblablement tués à la fin du tour). On attend la réponse, au plus 1 s
+  # (budget SessionEnd : 1,5 s).
+  claude_done | claude_end) envoyer "$delai_fin_s" ;;
+  # Le reste (dizaines de PostToolUse par minute) part détaché pour rendre la main tout de suite.
+  *) ( envoyer "$delai_curl_s" & ) >/dev/null 2>&1 ;;
+esac
 exit 0
