@@ -1,4 +1,5 @@
 #include "etat.h"
+#include <stdio.h>
 #include <string.h>
 
 static EtatCourant etat;  // l'Expression courante, que le Rappel recouvre sans la toucher
@@ -22,10 +23,82 @@ static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
 static bool jeuConnu = false;
 static unsigned long nouvellesJeuMs = 0;  // dernier game reçu
 
-// Anti-rebond du Bouton
-static bool boutonEnfonce = false;
-static bool boutonChangement = false;  // un changement accepté a déjà eu lieu
-static unsigned long boutonChangementMs = 0;
+// Table des Sessions Claude Code : identifiant, État Claude, texte brut du dernier Événement
+// (« libellé\nprojet »), instant du dernier changement. La Session anonyme a l'identifiant "".
+// Pleine, la plus ancienne (changementMs minimal) cède la place à une nouvelle Session.
+struct Session {
+  bool utilisee;
+  char id[SESSION_ID_MAX + 1];
+  EtatClaude etat;
+  char texte[TEXTE_MAX * 2 + 2];  // les deux lignes brutes ; tronqué ensuite par installer
+  unsigned long changementMs;
+};
+static Session sessions[SESSIONS_MAX];
+
+// Session déjà connue, ou nullptr (ne crée rien).
+static Session* sessionConnue(const char* id) {
+  if (id == nullptr) id = "";
+  for (Session& s : sessions)
+    if (s.utilisee && strncmp(s.id, id, SESSION_ID_MAX) == 0) return &s;
+  return nullptr;
+}
+
+static Session& sessionPour(const char* id, unsigned long maintenantMs) {
+  if (id == nullptr) id = "";
+  if (Session* connue = sessionConnue(id)) return *connue;
+  Session* libre = nullptr;
+  Session* ancienne = &sessions[0];
+  for (Session& s : sessions) {
+    if (!s.utilisee) { if (libre == nullptr) libre = &s; continue; }
+    if (s.changementMs < ancienne->changementMs) ancienne = &s;
+  }
+  Session& s = libre != nullptr ? *libre : *ancienne;
+  s.utilisee = true;
+  strncpy(s.id, id, SESSION_ID_MAX);
+  s.id[SESSION_ID_MAX] = '\0';
+  s.etat = CLAUDE_FINI;
+  s.texte[0] = '\0';
+  s.changementMs = maintenantMs;
+  return s;
+}
+
+// Met la Session dans cet État Claude, à cet instant, avec le texte brut de l'Événement (pour le Rappel Claude).
+static void majSession(Session& s, EtatClaude etat, const char* texte, unsigned long maintenantMs) {
+  s.etat = etat;
+  s.changementMs = maintenantMs;
+  strncpy(s.texte, texte == nullptr ? "" : texte, sizeof(s.texte) - 1);
+  s.texte[sizeof(s.texte) - 1] = '\0';
+}
+
+// Session dans cet État Claude depuis le plus récent changement, ou nullptr. Égalité d'instant : la dernière de la table.
+static const Session* laPlusRecente(EtatClaude etat) {
+  const Session* res = nullptr;
+  for (const Session& s : sessions)
+    if (s.utilisee && s.etat == etat && (res == nullptr || s.changementMs >= res->changementMs)) res = &s;
+  return res;
+}
+
+static const Session* attenteLaPlusRecente() {
+  return laPlusRecente(CLAUDE_ATTEND);
+}
+
+// Anti-rebond d'un Bouton : niveau accepté et instant du dernier changement accepté.
+struct Bouton {
+  bool enfonce;
+  bool changement;  // un changement accepté a déjà eu lieu
+  unsigned long changementMs;
+};
+static Bouton boutonMusique, boutonClaude;
+
+// Vrai sur un front d'appui accepté (anti-rebond passé) ; un relâchement ou un niveau inchangé renvoie faux.
+static bool frontAppui(Bouton& b, bool enfonce, unsigned long maintenantMs) {
+  if (enfonce == b.enfonce) return false;
+  if (b.changement && maintenantMs - b.changementMs < ANTI_REBOND_MS) return false;
+  b.enfonce = enfonce;
+  b.changement = true;
+  b.changementMs = maintenantMs;
+  return enfonce;
+}
 
 // Lettres non ASCII disponibles en CP437 : {point de code Unicode, octet CP437}.
 static const struct { unsigned int unicode; unsigned char cp437; } TABLE_CP437[] = {
@@ -65,6 +138,7 @@ static void demarrerSon(Son son, unsigned long maintenantMs) {
 static const Note* melodie(Son son, int* n) {
   if (son == SON_FANFARE) { *n = sizeof(MELODIE_FANFARE) / sizeof(Note); return MELODIE_FANFARE; }
   if (son == SON_CARILLON) { *n = sizeof(MELODIE_CARILLON) / sizeof(Note); return MELODIE_CARILLON; }
+  if (son == SON_CLOCHETTE) { *n = sizeof(MELODIE_CLOCHETTE) / sizeof(Note); return MELODIE_CLOCHETTE; }
   *n = 0;
   return nullptr;
 }
@@ -124,9 +198,11 @@ static void jeu(unsigned long maintenantMs) {
   strcpy(etat.texte, jeuNom);
 }
 
-// Point de retour : Jeu s'il y a un Jeu courant, sinon le Repos.
+// Point de retour : interpelle (Session qui attend la plus récente) > Jeu > Repos.
 static void retour(unsigned long maintenantMs) {
-  if (jeuConnu) jeu(maintenantMs);
+  const Session* attente = attenteLaPlusRecente();
+  if (attente != nullptr) installer(EXPR_INTERPELLE, attente->texte, false, maintenantMs, 0);
+  else if (jeuConnu) jeu(maintenantMs);
   else repos();
 }
 
@@ -138,19 +214,21 @@ static bool oublierJeu() {
   return true;
 }
 
-void etatInit(bool boutonEnfonceAuDemarrage) {
+void etatInit(bool boutonMusiqueEnfonceAuDemarrage, bool boutonClaudeEnfonceAuDemarrage) {
   repos();
   sonCourant = SON_AUCUN;
   rappelActif = false;
   morceauConnu = false;
   morceauEnPause = false;
   jeuConnu = false;
-  boutonEnfonce = boutonEnfonceAuDemarrage;  // tenu au démarrage : pas de front d'appui
-  boutonChangement = false;
+  memset(sessions, 0, sizeof(sessions));
+  // tenu au démarrage : pas de front d'appui
+  boutonMusique = {boutonMusiqueEnfonceAuDemarrage, false, 0};
+  boutonClaude = {boutonClaudeEnfonceAuDemarrage, false, 0};
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
-  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop"};
+  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop", "claude_end"};
   if (nom == nullptr) return false;
   for (unsigned i = 0; i < sizeof(NOMS) / sizeof(*NOMS); i++) {
     if (strcmp(nom, NOMS[i]) == 0) {
@@ -184,11 +262,15 @@ unsigned long etatDureeMusique(const char* ligne1, const char* ligne2) {
 }
 
 static bool recevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
-                     const char* artiste) {
+                     const char* artiste, const char* session) {
   switch (type) {
-    case EV_CLAUDE_DONE:
+    case EV_CLAUDE_DONE: {
+      Session& s = sessionPour(session, maintenantMs);
+      majSession(s, CLAUDE_FINI, texte, maintenantMs);
+      demarrerSon(SON_CLOCHETTE, maintenantMs);
       installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
       return true;
+    }
     case EV_GIT_PUSH:
       installer(EXPR_PUSH, texte, true, maintenantMs, DUREE_GIT_PUSH_MS);
       demarrerSon(SON_FANFARE, maintenantMs);
@@ -217,18 +299,24 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       nouvellesMusiqueMs = maintenantMs;
       morceauEnPause = true;
       return false;
-    // Expression persistante : reste jusqu'au prochain Événement.
-    // Limite connue : avec plusieurs sessions Claude Code, le dernier Événement gagne
-    // (un claude_working d'une session peut effacer le claude_waiting d'une autre).
-    case EV_CLAUDE_WAITING:
-      installer(EXPR_INTERPELLE, texte, false, maintenantMs, 0);
+    // Persistante : la Session attend jusqu'à son propre claude_working ou claude_done.
+    case EV_CLAUDE_WAITING: {
+      Session& s = sessionPour(session, maintenantMs);
+      majSession(s, CLAUDE_ATTEND, texte, maintenantMs);
+      installer(EXPR_INTERPELLE, s.texte, false, maintenantMs, 0);
       demarrerSon(SON_CARILLON, maintenantMs);
       return true;
-    // Ramène au Repos seulement si on attend ; sinon sans effet (l'API répond quand même 200).
-    case EV_CLAUDE_WORKING:
-      if (etat.expression != EXPR_INTERPELLE) return false;
+    }
+    // Change l'affichage seulement si c'est la Session affichée qui reprend ; passe alors au point
+    // de retour (autre Session qui attend, Jeu, Repos), sans carillon. Sinon sans effet (l'API répond 200).
+    case EV_CLAUDE_WORKING: {
+      Session& s = sessionPour(session, maintenantMs);
+      bool affichee = s.etat == CLAUDE_ATTEND && attenteLaPlusRecente() == &s;
+      majSession(s, CLAUDE_TRAVAILLE, texte, maintenantMs);  // texte gardé pour le Rappel Claude, pas d'affichage direct
+      if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
       retour(maintenantMs);
       return true;
+    }
     // Ne changent que le point de retour ; Jeu ne s'affiche tout de suite qu'au Repos (ou sur place).
     case EV_GAME: {
       char nom[TEXTE_MAX + 1];
@@ -245,14 +333,25 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     }
     case EV_GAME_STOP:
       return oublierJeu();
+    // Oublie la Session (inconnue : sans effet, sans lui prendre de place) ; change l'affichage
+    // seulement si c'était la Session affichée : passage au point de retour, sans carillon.
+    case EV_CLAUDE_END: {
+      Session* s = sessionConnue(session);
+      if (s == nullptr) return false;
+      bool affichee = s->etat == CLAUDE_ATTEND && attenteLaPlusRecente() == s;
+      s->utilisee = false;
+      if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
+      retour(maintenantMs);
+      return true;
+    }
   }
   return false;  // inatteignable : tous les types sont traités ci-dessus
 }
 
 // Un Événement qui change l'Expression met fin au Rappel ; sans effet (false), il ne l'interrompt pas.
 bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
-                  const char* artiste) {
-  bool change = recevoir(type, texte, maintenantMs, artiste);
+                  const char* artiste, const char* session) {
+  bool change = recevoir(type, texte, maintenantMs, artiste, session);
   if (type == EV_GAME || type == EV_GAME_STOP) return change && !rappelActif;  // le Rappel continue
   if (change) rappelActif = false;
   return change;
@@ -276,12 +375,7 @@ bool etatMiseAJour(unsigned long maintenantMs) {
 }
 
 bool etatBouton(bool enfonce, unsigned long maintenantMs) {
-  if (enfonce == boutonEnfonce) return false;
-  if (boutonChangement && maintenantMs - boutonChangementMs < ANTI_REBOND_MS) return false;
-  boutonEnfonce = enfonce;
-  boutonChangement = true;
-  boutonChangementMs = maintenantMs;
-  if (!enfonce) return false;
+  if (!frontAppui(boutonMusique, enfonce, maintenantMs)) return false;
 
   oublierSiPerime(maintenantMs);
   if (morceauConnu && !morceauEnPause) {
@@ -292,6 +386,42 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
     rappel.ligne2[0] = '\0';
     rappel.dureeMs = DUREE_SILENCE_MS;
   }
+  rappel.temporaire = true;
+  rappel.debutMs = maintenantMs;
+  rappelActif = true;
+  return true;
+}
+
+// Rappel Claude : l'État Claude le plus urgent. Priorité : attend > travaille > a fini > Sans Claude.
+bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
+  if (!frontAppui(boutonClaude, enfonce, maintenantMs)) return false;
+
+  const Session* s = attenteLaPlusRecente();
+  rappel.expression = EXPR_INTERPELLE;
+  if (s == nullptr) { s = laPlusRecente(CLAUDE_TRAVAILLE); rappel.expression = EXPR_TRAVAILLE; }
+  if (s == nullptr) { s = laPlusRecente(CLAUDE_FINI); rappel.expression = EXPR_CONTENT; }
+  int utilisees = 0;
+  for (const Session& t : sessions) if (t.utilisee) utilisees++;
+  int autres = utilisees - 1;  // Sessions autres que celle affichée (-1 si aucune, sans effet)
+  if (s == nullptr) {
+    rappel.expression = EXPR_SANS_CLAUDE;
+    etatVersCp437("pas de Claude", rappel.texte, TEXTE_MAX + 1);
+    rappel.ligne2[0] = '\0';
+  } else {
+    if (rappel.expression == EXPR_TRAVAILLE) {  // le texte d'une Session qui travaille est son projet : ligne 2
+      etatVersCp437("travaille", rappel.texte, TEXTE_MAX + 1);
+      etatVersCp437(s->texte, rappel.ligne2, TEXTE_MAX + 1);
+    } else {
+      lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);
+    }
+    static_assert(SESSIONS_MAX <= 10, "« +N » doit tenir sur un chiffre (snprintf de 4 octets)");
+    if (autres > 0 && autres <= 9) {  // « +N » en fin de ligne 1 (borne redondante avec le static_assert, pour gcc), sans dépasser TEXTE_MAX
+      int n = (int)strlen(rappel.texte);
+      if (n > TEXTE_MAX - 3) n = TEXTE_MAX - 3;
+      snprintf(rappel.texte + n, 4, " +%d", autres);
+    }
+  }
+  rappel.dureeMs = DUREE_RAPPEL_CLAUDE_MS;
   rappel.temporaire = true;
   rappel.debutMs = maintenantMs;
   rappelActif = true;

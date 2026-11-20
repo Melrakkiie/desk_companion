@@ -10,6 +10,7 @@ const unsigned long DUREE_CLAUDE_DONE_MS = 5000;
 const unsigned long DUREE_GIT_PUSH_MS = 3000;
 const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
 const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (aucun Morceau courant)
+const unsigned long DUREE_RAPPEL_CLAUDE_MS = 3000;
 // Le PC renvoie l'état de lecture (music ou music_stop) toutes les 10 s (hook, hors module) ;
 // sans aucune nouvelle pendant 30 s, le Compagnon oublie le Morceau courant (3 renvois manqués).
 const unsigned long OUBLI_MORCEAU_MS = 30000;
@@ -44,6 +45,10 @@ const Note MELODIE_FANFARE[] = {
 const Note MELODIE_CARILLON[] = {
   {988, 150}, {0, 30}, {784, 250},
 };
+// Clochette (claude_done) : trois notes montantes Mi-Sol-Do aigu, < 0,5 s (le carillon descend).
+const Note MELODIE_CLOCHETTE[] = {
+  {1319, 100}, {1568, 100}, {2093, 150},
+};
 
 // Géométrie de l'écran mesurée sur le matériel (ticket #3) : la bande jaune du haut est le Bandeau.
 const int BANDEAU_HAUTEUR = 16;     // Bandeau = lignes 0 à 15
@@ -66,7 +71,8 @@ enum TypeEvenement {
   EV_GIT_PUSH,
   EV_MUSIC_STOP,
   EV_GAME,       // texte = nom du jeu
-  EV_GAME_STOP
+  EV_GAME_STOP,
+  EV_CLAUDE_END  // SessionEnd : la Session est oubliée
 };
 
 enum Expression {
@@ -76,7 +82,9 @@ enum Expression {
   EXPR_MUSIQUE,     // music (ticket #8)
   EXPR_PUSH,        // git_push (ticket #9)
   EXPR_JEU,         // Jeu courant : point de retour à la place du Repos
-  EXPR_SILENCE      // Rappel sans Morceau courant : jamais issue d'un Événement
+  EXPR_SILENCE,     // Rappel sans Morceau courant : jamais issue d'un Événement
+  EXPR_SANS_CLAUDE, // Rappel Claude sans Session connue : jamais issue d'un Événement
+  EXPR_TRAVAILLE    // Rappel Claude d'une Session qui travaille : jamais issue d'un Événement
 };
 
 struct EtatCourant {
@@ -96,7 +104,7 @@ void etatVersCp437(const char* utf8, char* sortie, int taille);
 // Traduit le nom d'un type ("claude_done"...) ; faux si le type est inconnu.
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type);
 
-enum Son { SON_AUCUN, SON_FANFARE, SON_CARILLON };
+enum Son { SON_AUCUN, SON_FANFARE, SON_CARILLON, SON_CLOCHETTE };
 
 // Durée totale d'un Son (ms) ; 0 pour SON_AUCUN.
 unsigned long etatDureeSon(Son son);
@@ -104,7 +112,7 @@ unsigned long etatDureeSon(Son son);
 // Fréquence (Hz) à jouer pour ce Son après tempsEcouleMs ; 0 = silence ou Son terminé.
 unsigned int etatFrequenceSon(Son son, unsigned long tempsEcouleMs);
 
-// Son en cours (ou terminé : seule la fréquence 0 le dit) ; démarré par claude_waiting et git_push,
+// Son en cours (ou terminé : seule la fréquence 0 le dit) ; démarré par claude_done, claude_waiting et git_push,
 // jamais interrompu par les autres Événements.
 Son etatSonCourant();
 
@@ -112,13 +120,21 @@ Son etatSonCourant();
 unsigned int etatFrequence(unsigned long maintenantMs);
 
 // Remet l'État au Repos et le Son à SON_AUCUN. boutonEnfonceAuDemarrage : niveau du Bouton à cet
-// instant ; un Bouton déjà tenu ne montre pas de Rappel (il faut le relâcher puis le renfoncer).
-void etatInit(bool boutonEnfonceAuDemarrage = false);
+// instant (musique : D27, Claude : D26) ; un Bouton déjà tenu ne montre pas de Rappel (il faut le
+// relâcher puis le renfoncer).
+void etatInit(bool boutonMusiqueEnfonceAuDemarrage = false, bool boutonClaudeEnfonceAuDemarrage = false);
 
-// Applique un Événement (le dernier gagne). Renvoie vrai si l'Expression a changé.
-// texte et artiste peuvent être nullptr.
+// État Claude d'une Session (voir GLOSSARY.md).
+enum EtatClaude { CLAUDE_ATTEND, CLAUDE_TRAVAILLE, CLAUDE_FINI };
+
+const int SESSIONS_MAX = 8;       // taille de la table des Sessions ; la plus ancienne cède la place
+const int SESSION_ID_MAX = 40;    // longueur conservée de l'identifiant (le reste est tronqué)
+
+// Applique un Événement. Renvoie vrai si l'Expression a changé.
+// texte, artiste et session peuvent être nullptr ; session = identifiant de la Session Claude Code
+// (claude_*), nullptr = Session anonyme unique. Seuls les Événements de la même Session changent son État Claude.
 bool etatRecevoir(TypeEvenement type, const char* texte, unsigned long maintenantMs,
-                  const char* artiste = nullptr);
+                  const char* artiste = nullptr, const char* session = nullptr);
 
 // À appeler à chaque tour de loop() : renvoie vrai si l'Expression a changé (retour au Repos).
 bool etatMiseAJour(unsigned long maintenantMs);
@@ -128,6 +144,11 @@ bool etatMiseAJour(unsigned long maintenantMs);
 // courant, sinon silence) ; un bouton maintenu ou qui rebondit n'en montre qu'un seul.
 // Renvoie vrai si l'affichage change.
 bool etatBouton(bool enfonce, unsigned long maintenantMs);
+
+// Bouton Claude (D26), mêmes règles que etatBouton, anti-rebond propre. L'appui montre le Rappel
+// Claude (3 s, sans Son) : l'État Claude le plus urgent (attend > travaille > a fini > Sans Claude), « +N » en fin de ligne 1 pour les N autres
+// Sessions connues. Le dernier appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
+bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs);
 
 // Expression à afficher : le Rappel s'il y en a un, sinon l'Expression courante.
 const EtatCourant& etatCourant();

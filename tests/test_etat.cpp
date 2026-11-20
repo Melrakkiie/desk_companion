@@ -393,7 +393,6 @@ static void test_son_fanfare_au_push_et_carillon_au_waiting() {
 static void test_son_evenements_silencieux_ne_touchent_pas_au_son() {
   etatInit();
   etatRecevoir(EV_GIT_PUSH, nullptr, 0);
-  etatRecevoir(EV_CLAUDE_DONE, "p", 100);
   etatRecevoir(EV_MUSIC, "titre", 200, "artiste");
   etatRecevoir(EV_CLAUDE_WORKING, nullptr, 300);  // sans effet
   assert(etatSonCourant() == SON_FANFARE);
@@ -444,6 +443,35 @@ static void test_son_frequence_carillon_aux_bornes() {
   assert(etatFrequence(180) == 784);
   assert(etatFrequence(429) == 784);
   assert(etatFrequence(430) == 0);  // terminé
+}
+
+static void test_son_clochette_au_done_aux_bornes() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "p", 0);
+  assert(etatSonCourant() == SON_CLOCHETTE);
+  assert(etatFrequence(0) == 1319);
+  assert(etatFrequence(99) == 1319);
+  assert(etatFrequence(100) == 1568);
+  assert(etatFrequence(199) == 1568);
+  assert(etatFrequence(200) == 2093);
+  assert(etatFrequence(349) == 2093);
+  assert(etatFrequence(350) == 0);  // terminé
+  assert(etatDureeSon(SON_CLOCHETTE) < 500);
+}
+
+static void test_son_clochette_interrompt_et_est_interrompue_seulement_par_un_son() {
+  etatInit();
+  etatRecevoir(EV_GIT_PUSH, nullptr, 0);
+  etatRecevoir(EV_CLAUDE_DONE, "p", 100);  // interrompt la fanfare
+  assert(etatSonCourant() == SON_CLOCHETTE);
+  assert(etatFrequence(100) == 1319);
+  etatRecevoir(EV_CLAUDE_WAITING, nullptr, 200);  // interrompt la clochette
+  assert(etatSonCourant() == SON_CARILLON);
+  etatRecevoir(EV_CLAUDE_DONE, "p", 300);  // interrompt le carillon
+  assert(etatSonCourant() == SON_CLOCHETTE);
+  etatRecevoir(EV_MUSIC, "titre", 320, "artiste");  // sans Son : ne l'interrompt pas
+  assert(etatSonCourant() == SON_CLOCHETTE);
+  assert(etatFrequence(420) == 1568);
 }
 
 static void test_son_durees_totales() {
@@ -633,12 +661,391 @@ static void test_rappel_evenement_qui_change_y_met_fin_working_sans_effet_non() 
   assert(etatSonCourant() == SON_FANFARE);
 }
 
+// Sessions : l'identifiant (5e argument) sépare les attentes ; nullptr = Session anonyme.
+static void test_sessions_working_d_une_autre_ne_coupe_pas_l_attente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "B", 100, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(!etatMiseAJour(60000));  // pas de délai d'attente
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_sessions_done_d_une_autre_content_puis_retour_a_l_attente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  assert(etatRecevoir(EV_CLAUDE_DONE, "B", 1000, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  assert(etatMiseAJour(1000 + DUREE_CLAUDE_DONE_MS));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "A") == 0);
+}
+
+static void test_sessions_expression_temporaire_retour_a_l_attente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_GIT_PUSH, "main", 1000);
+  assert(etatCourant().expression == EXPR_PUSH);
+  assert(etatMiseAJour(1000 + DUREE_GIT_PUSH_MS));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  etatRecevoir(EV_MUSIC, "Titre", 5000, "Artiste");
+  assert(etatMiseAJour(5000 + etatCourant().dureeMs));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_sessions_interpelle_l_emporte_sur_le_jeu() {
+  etatInit();
+  etatRecevoir(EV_GAME, "Jeu", 0);
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "A", 1000, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(!etatRecevoir(EV_GAME, "Autre", 2000));
+  assert(!etatRecevoir(EV_GAME_STOP, nullptr, 2500));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  etatRecevoir(EV_GAME, "Jeu", 3000);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "A", 4000, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_JEU);  // Jeu connu à nouveau
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 5000, nullptr, "a");
+  etatRecevoir(EV_GAME_STOP, nullptr, 5500);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "A", 6000, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sessions_la_plus_recente_puis_la_precedente_sans_carillon() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 1000, nullptr, "b");
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  unsigned long fin = 1000 + etatDureeSon(SON_CARILLON);
+  assert(etatFrequence(fin) == 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "B", fin, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatFrequence(fin) == 0);  // pas de nouveau carillon
+  assert(etatSonCourant() == SON_CARILLON);
+  assert(etatRecevoir(EV_CLAUDE_DONE, "A", fin + 1, nullptr, "a"));
+  assert(etatMiseAJour(fin + 1 + DUREE_CLAUDE_DONE_MS));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sessions_seuls_working_et_done_de_la_meme_session_terminent_l_attente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "x", 10, nullptr, "inconnue"));
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "x", 20));  // anonyme != "a"
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "x", 30, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sessions_anonyme_comme_avant_et_distincte_des_nommees() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "anon", 0);
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 100, nullptr, "a");
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 200, nullptr, "a"));
+  assert(strcmp(etatCourant().texte, "anon") == 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 300));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_sessions_rappel_pendant_attente_de_deux_sessions() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 100, nullptr, "b");
+  etatBouton(true, 1000);
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, nullptr, 1500, nullptr, "inconnue"));  // sans effet : le Rappel continue
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatMiseAJour(4000));
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  etatBouton(false, 4100);
+  etatBouton(true, 5000);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, nullptr, 5500, nullptr, "b"));  // change l'Expression : fin du Rappel
+  assert(strcmp(etatCourant().texte, "A") == 0);
+}
+
+static void test_sessions_au_dela_de_huit_la_plus_ancienne_est_evincee() {
+  etatInit();
+  char id[8];
+  for (int i = 0; i < 9; i++) {
+    snprintf(id, sizeof id, "s%d", i);
+    etatRecevoir(EV_CLAUDE_WAITING, id, 100 + i, nullptr, id);
+  }
+  assert(strcmp(etatCourant().texte, "s8") == 0);
+  for (int i = 8; i >= 1; i--) {
+    snprintf(id, sizeof id, "s%d", i);
+    assert(strcmp(etatCourant().texte, id) == 0);
+    etatRecevoir(EV_CLAUDE_WORKING, nullptr, 1000 + i, nullptr, id);
+  }
+  assert(etatCourant().expression == EXPR_REPOS);  // s0 évincée : plus rien n'attend
+}
+
+static void test_end_de_la_session_affichee_passe_a_la_suivante_sans_carillon() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 1000, nullptr, "b");
+  unsigned long fin = 1000 + etatDureeSon(SON_CARILLON);
+  assert(etatRecevoir(EV_CLAUDE_END, nullptr, fin, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatFrequence(fin) == 0);  // pas de nouveau carillon
+  assert(etatRecevoir(EV_CLAUDE_END, nullptr, fin + 1, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_end_d_une_session_non_affichee_ne_change_rien_et_l_oublie() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 1000, nullptr, "b");
+  assert(!etatRecevoir(EV_CLAUDE_END, nullptr, 2000, nullptr, "a"));
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  assert(etatRecevoir(EV_CLAUDE_END, nullptr, 3000, nullptr, "b"));
+  assert(etatCourant().expression == EXPR_REPOS);  // A oubliée : plus rien n'attend
+}
+
+static void test_end_d_une_session_inconnue_est_sans_effet() {
+  etatInit();
+  assert(!etatRecevoir(EV_CLAUDE_END, nullptr, 0, nullptr, "inconnue"));
+  assert(etatCourant().expression == EXPR_REPOS);
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 100, nullptr, "a");
+  assert(!etatRecevoir(EV_CLAUDE_END, nullptr, 200, nullptr, "inconnue"));
+  assert(!etatRecevoir(EV_CLAUDE_END, nullptr, 300));  // anonyme inconnue
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+}
+
+static void test_end_ne_consomme_pas_de_place_dans_la_table() {
+  etatInit();
+  char id[8];
+  for (int i = 0; i < 8; i++) {
+    snprintf(id, sizeof id, "s%d", i);
+    etatRecevoir(EV_CLAUDE_WAITING, id, 100 + i, nullptr, id);
+  }
+  for (int i = 0; i < 20; i++) etatRecevoir(EV_CLAUDE_END, nullptr, 500 + i, nullptr, "inconnue");
+  etatRecevoir(EV_CLAUDE_WORKING, nullptr, 900, nullptr, "s7");
+  assert(strcmp(etatCourant().texte, "s6") == 0);
+  for (int i = 6; i >= 0; i--) {  // s0 est toujours là
+    snprintf(id, sizeof id, "s%d", i);
+    assert(strcmp(etatCourant().texte, id) == 0);
+    etatRecevoir(EV_CLAUDE_WORKING, nullptr, 1000 + i, nullptr, id);
+  }
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_end_nomme_reconnu_par_l_api() {
+  TypeEvenement t;
+  assert(etatTypeDepuisNom("claude_end", &t) && t == EV_CLAUDE_END);
+}
+
+static void test_eviction_d_une_neuvieme_session_chasse_la_plus_ancienne_meme_non_affichee() {
+  etatInit();
+  char id[8];
+  for (int i = 0; i < 8; i++) {  // s0 attend, les autres travaillent
+    snprintf(id, sizeof id, "s%d", i);
+    etatRecevoir(i == 0 ? EV_CLAUDE_WAITING : EV_CLAUDE_WORKING, i == 0 ? "A" : "x", 100 + i, nullptr, id);
+  }
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 500, nullptr, "s8");  // neuvième : chasse s0
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "x", 600, nullptr, "s8"));
+  assert(etatCourant().expression == EXPR_REPOS);  // s0 oubliée, pas de retour à "A"
+}
+
+static void test_attente_ne_disparait_pas_avec_le_temps_meme_a_plusieurs() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "A", 0, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 10, nullptr, "b");
+  etatMiseAJour(10UL * 24 * 3600 * 1000);
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  etatRecevoir(EV_CLAUDE_END, nullptr, 10UL * 24 * 3600 * 1000 + 1, nullptr, "b");
+  assert(strcmp(etatCourant().texte, "A") == 0);
+}
+
+static void test_bouton_claude_sans_session_sans_claude_3s_puis_retour() {
+  etatInit();
+  assert(etatBoutonClaude(true, 1000));
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  assert(strcmp(etatCourant().texte, "pas de Claude") == 0);
+  assert(etatCourant().ligne2[0] == '\0');
+  assert(etatSonCourant() == SON_AUCUN);
+  assert(!etatMiseAJour(3999));
+  assert(etatMiseAJour(4000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_claude_attend_interpelle_avec_libelle_et_projet() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nprojet-a", 500, nullptr, "a");
+  etatRecevoir(EV_GAME, "Jeu", 600);
+  assert(etatBoutonClaude(true, 1000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+  assert(etatCourant().dureeMs == 3000);
+  assert(etatMiseAJour(4000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);  // l'Expression courante, en dessous
+}
+
+static void test_bouton_claude_attend_la_plus_recente_avant_fini() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "libelle A\nprojet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 200, nullptr, "b");
+  etatRecevoir(EV_CLAUDE_WAITING, "libelle C\nprojet-c", 300, nullptr, "c");
+  etatBoutonClaude(true, 1000);
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
+}
+
+static void test_bouton_claude_travaille_avant_fini() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 200, nullptr, "b");
+  etatMiseAJour(10000);
+  etatBoutonClaude(true, 11000);
+  assert(etatCourant().expression == EXPR_TRAVAILLE);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+  assert(etatCourant().dureeMs == 3000);
+}
+
+static void test_bouton_claude_attend_avant_travaille() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 200, nullptr, "b");
+  etatBoutonClaude(true, 1000);
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+}
+
+static void test_bouton_claude_travaille_la_plus_recente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 200, nullptr, "b");
+  etatBoutonClaude(true, 1000);
+  assert(etatCourant().expression == EXPR_TRAVAILLE);
+  assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
+}
+
+static void test_claude_working_hors_rappel_ne_change_rien() {
+  etatInit();
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "projet-a", 100, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_claude_fini_content_de_la_plus_recente() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 200, nullptr, "b");
+  etatMiseAJour(10000);
+  etatBoutonClaude(true, 11000);
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strncmp(etatCourant().texte, "projet-b", 8) == 0);
+  assert(etatSonCourant() == SON_CLOCHETTE);  // le Son de claude_done, pas du Rappel
+  assert(etatFrequence(11000 + etatDureeSon(SON_CLOCHETTE)) == 0);
+}
+
+static void test_bouton_claude_compteur_autres_sessions() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_DONE, "projet-a", 100, nullptr, "a");
+  etatBoutonClaude(true, 1000);
+  assert(strcmp(etatCourant().texte, "projet-a") == 0);  // une seule : pas de compteur
+  etatBoutonClaude(false, 1100);
+  etatRecevoir(EV_CLAUDE_DONE, "projet-b", 1200, nullptr, "b");
+  etatBoutonClaude(true, 2000);
+  assert(strcmp(etatCourant().texte, "projet-b +1") == 0);
+  etatBoutonClaude(false, 2100);
+  etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-c", 2200, nullptr, "c");
+  etatBoutonClaude(true, 3000);
+  assert(strcmp(etatCourant().texte, "libelle +2") == 0);
+  assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
+}
+
+static void test_bouton_claude_compteur_ne_deborde_pas_la_ligne() {
+  etatInit();
+  char long_[TEXTE_MAX + 20];
+  memset(long_, 'x', sizeof(long_));
+  long_[sizeof(long_) - 1] = '\0';
+  etatRecevoir(EV_CLAUDE_DONE, long_, 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_DONE, "b", 200, nullptr, "b");
+  etatBoutonClaude(true, 1000);
+  assert(strlen(etatCourant().texte) <= TEXTE_MAX);
+  assert(strcmp(etatCourant().texte, "b +1") == 0);
+  etatBoutonClaude(false, 1100);
+  etatRecevoir(EV_CLAUDE_DONE, long_, 1200, nullptr, "a");
+  etatBoutonClaude(true, 2000);
+  assert(strlen(etatCourant().texte) <= TEXTE_MAX);
+  assert(strcmp(etatCourant().texte + strlen(etatCourant().texte) - 3, " +1") == 0);
+}
+
+static void test_bouton_claude_remplace_rappel_musique_et_inversement() {
+  etatInit();
+  etatBouton(true, 1000);
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatBoutonClaude(true, 1500));
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  assert(etatCourant().debutMs == 1500);
+  assert(etatBoutonClaude(false, 1600) == false);
+  assert(etatBouton(false, 1600) == false);
+  assert(etatBouton(true, 2000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatCourant().debutMs == 2000);
+  assert(etatMiseAJour(5000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_boutons_anti_rebond_independants() {
+  etatInit();
+  assert(etatBouton(true, 1000));
+  assert(etatBoutonClaude(true, 1010));   // le rebond de l'autre Bouton ne le concerne pas
+  assert(!etatBoutonClaude(false, 1020)); // rebond de D26 ignoré
+  assert(!etatBoutonClaude(true, 1030));
+  assert(etatCourant().debutMs == 1010);
+  assert(!etatBoutonClaude(false, 1500));
+  assert(etatBoutonClaude(true, 1600));   // vrai nouvel appui
+}
+
+static void test_bouton_claude_tenu_au_demarrage_sans_rappel() {
+  etatInit(false, true);
+  assert(!etatBoutonClaude(true, 100));
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(!etatBoutonClaude(false, 500));
+  assert(etatBoutonClaude(true, 1000));
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  etatInit(true, false);  // l'autre Bouton tenu n'empêche pas D26
+  assert(etatBoutonClaude(true, 100));
+}
+
+static void test_rappel_claude_evenement_qui_change_y_met_fin() {
+  etatInit();
+  etatBoutonClaude(true, 1000);
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "", 1500, nullptr, "a"));  // sans effet : le Rappel continue
+  assert(etatCourant().expression == EXPR_SANS_CLAUDE);
+  assert(etatRecevoir(EV_GIT_PUSH, "p", 2000));
+  assert(etatCourant().expression == EXPR_PUSH);
+}
+
 int main() {
+  test_end_de_la_session_affichee_passe_a_la_suivante_sans_carillon();
+  test_end_d_une_session_non_affichee_ne_change_rien_et_l_oublie();
+  test_end_d_une_session_inconnue_est_sans_effet();
+  test_end_ne_consomme_pas_de_place_dans_la_table();
+  test_end_nomme_reconnu_par_l_api();
+  test_eviction_d_une_neuvieme_session_chasse_la_plus_ancienne_meme_non_affichee();
+  test_attente_ne_disparait_pas_avec_le_temps_meme_a_plusieurs();
+  test_sessions_working_d_une_autre_ne_coupe_pas_l_attente();
+  test_sessions_done_d_une_autre_content_puis_retour_a_l_attente();
+  test_sessions_expression_temporaire_retour_a_l_attente();
+  test_sessions_interpelle_l_emporte_sur_le_jeu();
+  test_sessions_la_plus_recente_puis_la_precedente_sans_carillon();
+  test_sessions_seuls_working_et_done_de_la_meme_session_terminent_l_attente();
+  test_sessions_anonyme_comme_avant_et_distincte_des_nommees();
+  test_sessions_rappel_pendant_attente_de_deux_sessions();
+  test_sessions_au_dela_de_huit_la_plus_ancienne_est_evincee();
   test_son_fanfare_au_push_et_carillon_au_waiting();
   test_son_evenements_silencieux_ne_touchent_pas_au_son();
   test_son_nouveau_son_remplace_et_repart_du_debut();
   test_son_frequence_fanfare_aux_bornes();
   test_son_frequence_carillon_aux_bornes();
+  test_son_clochette_au_done_aux_bornes();
+  test_son_clochette_interrompt_et_est_interrompue_seulement_par_un_son();
   test_son_durees_totales();
   test_cp437_accents_francais();
   test_cp437_largeur_en_glyphes_et_troncature();
@@ -692,6 +1099,20 @@ int main() {
   test_rappel_pendant_waiting_retour_a_l_interpellation();
   test_rappel_pendant_expression_qui_expire_retour_au_repos();
   test_rappel_evenement_qui_change_y_met_fin_working_sans_effet_non();
+  test_bouton_claude_sans_session_sans_claude_3s_puis_retour();
+  test_bouton_claude_attend_interpelle_avec_libelle_et_projet();
+  test_bouton_claude_attend_la_plus_recente_avant_fini();
+  test_bouton_claude_fini_content_de_la_plus_recente();
+  test_bouton_claude_compteur_autres_sessions();
+  test_bouton_claude_compteur_ne_deborde_pas_la_ligne();
+  test_bouton_claude_remplace_rappel_musique_et_inversement();
+  test_boutons_anti_rebond_independants();
+  test_bouton_claude_tenu_au_demarrage_sans_rappel();
+  test_rappel_claude_evenement_qui_change_y_met_fin();
+  test_bouton_claude_travaille_avant_fini();
+  test_bouton_claude_attend_avant_travaille();
+  test_bouton_claude_travaille_la_plus_recente();
+  test_claude_working_hors_rappel_ne_change_rien();
   puts("Tous les tests passent.");
   return 0;
 }

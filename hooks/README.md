@@ -24,6 +24,24 @@ curl -X POST -H 'Content-Type: application/json' -d '{"type":"music","text":"Tit
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"git_push","text":"main"}' http://compagnon.local/event
 ```
 
+Les Événements Claude portent le `session_id` du hook dans `session` (chaîne, facultatif : absent = Session anonyme) ; le Compagnon suit l'attente de chaque Session séparément.
+
+Le hook `SessionEnd` envoie `claude_end` (avec `session`) : le Compagnon oublie la Session fermée ; si elle
+attendait, l'interpellation passe à la Session suivante qui attend, ou disparaît. `claude_end` d'une Session
+inconnue est sans effet. Pour une Session tuée sans `SessionEnd`, le Compagnon ne suit que 8 Sessions et oublie
+la plus ancienne à la neuvième ; une attente n'expire jamais avec le temps.
+
+```
+curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_end","text":"projet","session":"<session_id>"}' http://compagnon.local/event
+```
+
+Vérification de `SessionEnd` : documenté dans la référence des hooks de Claude Code (raisons `clear`, `resume`,
+`logout`, `prompt_input_exit`, `other` ; budget partagé de 1,5 s, que le script respecte en rendant la main
+tout de suite) et présent dans la version installée lors de l'écriture (2.1.329). Non vérifié en réel : le
+déclenchement effectif sur une vraie Session fermée, ni le cas d'un processus tué (SIGKILL), où le hook ne
+peut pas s'exécuter, d'où la limite de 8 Sessions. À contrôler après installation : fermer une Session qui attend
+et voir l'interpellation disparaître.
+
 Le `text` s'affiche sur deux lignes du Bandeau au plus : coupé au premier `\n` (ligne 2 = le reste).
 Chaque ligne est tronquée à 100 caractères et défile si elle dépasse l'écran.
 
