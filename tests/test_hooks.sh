@@ -103,15 +103,17 @@ printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","sess
 if [ -s "$TMP/log" ]; then echo "ok   PreToolUse AskUserQuestion envoyé avant de rendre la main"; else echo "ECHEC PreToolUse AskUserQuestion : rien reçu au retour du hook"; echec=1; fi
 
 # Cible injoignable : le script rend la main vite, code 0, sans rien écrire.
-# temps_max_ms <nom> <événement> <limite en ms>
+# temps_max_ms <nom> <événement> <limite en ms> [outil]
 temps_max_ms() {
   debut=$(date +%s%N)
-  printf '%s' "{\"hook_event_name\":\"$2\",\"cwd\":\"/x/p\"}" | COMPAGNON_URL=http://10.255.255.1 bash "$HOOK"
+  printf '%s' "{\"hook_event_name\":\"$2\",\"tool_name\":\"${4:-}\",\"cwd\":\"/x/p\"}" | COMPAGNON_URL=http://10.255.255.1 bash "$HOOK"
   code=$?
   ms=$(( ($(date +%s%N) - debut) / 1000000 ))
   if [ "$code" = 0 ] && [ "$ms" -lt "$3" ]; then echo "ok   $1 (${ms} ms)"; else echo "ECHEC $1 : code $code, ${ms} ms"; echec=1; fi
 }
 temps_max_ms "cible injoignable, PostToolUse ordinaire détaché" PostToolUse 500
+temps_max_ms "cible injoignable, UserPromptSubmit borné à 1 s" UserPromptSubmit 1500
+temps_max_ms "cible injoignable, PostToolUse AskUserQuestion borné à 1 s" PostToolUse 1500 AskUserQuestion
 temps_max_ms "cible injoignable, Stop borné à 3 s" Stop 3500
 temps_max_ms "cible injoignable, StopFailure borné à 3 s" StopFailure 3500
 temps_max_ms "cible injoignable, SessionEnd borné à 1 s" SessionEnd 1500
