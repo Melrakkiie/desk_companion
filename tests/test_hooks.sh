@@ -63,11 +63,14 @@ verifie "Notification d'un autre type -> rien envoyé" \
 # Fin de tour sur une question : « attend » (last_assistant_message).
 ATTEND='/event application/json {"type":"claude_waiting","text":"Hey?\nmon_projet","session":"s1"}'
 FINI='/event application/json {"type":"claude_done","text":"mon_projet","session":"s1"}'
-stop() { printf '{"hook_event_name":"%s","session_id":"s1","cwd":"/x/mon_projet","last_assistant_message":"%s"}' "$1" "$2"; }
+# stop <événement> <texte> : les \n du texte deviennent de vrais sauts de ligne, jq échappe le JSON.
+stop() { jq -nc --arg e "$1" --arg m "$(printf '%b' "$2")" \
+  '{hook_event_name: $e, session_id: "s1", cwd: "/x/mon_projet", last_assistant_message: $m}'; }
 verifie "Stop avec ❓ -> claude_waiting" "$(stop Stop 'Round 1\n❓ Quel nom ?\n➡️ je propose X')" "$ATTEND"
 verifie "Stop avec ligne needs input: -> claude_waiting" "$(stop Stop 'Job bloqué\nneeds input: choisis une option\nfin.')" "$ATTEND"
 verifie "Stop dont le dernier paragraphe finit par ? -> claude_waiting" "$(stop Stop 'Fait.\n\nTu veux que je pousse ?  \n\n')" "$ATTEND"
 verifie "Stop avec ? seulement dans un bloc de code -> claude_done" "$(stop Stop 'Voici :\n\n```\ncurl http://x?a=1\n```')" "$FINI"
+verifie "Stop avec bloc de code non fermé contenant ? -> claude_done" "$(stop Stop 'Voici :\n\n```\ncurl http://x?a=1 ?')" "$FINI"
 verifie "Stop avec ? dans un paragraphe non final -> claude_done" "$(stop Stop 'Tu veux ça ?\n\nJ ai fini.')" "$FINI"
 verifie "Stop avec texte vide -> claude_done" "$(stop Stop '')" "$FINI"
 verifie "StopFailure avec ? -> claude_done" "$(stop StopFailure 'Erreur ?')" "$FINI"
