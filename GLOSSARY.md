@@ -57,7 +57,7 @@ _À éviter_ : avatar, logo, sprite.
 
 | Type | Ce qui s'est passé | Expression | Son |
 |---|---|---|---|
-| `claude_done` | Une Session a fini de répondre | content, temporaire | clochette |
+| `claude_done` | Une Session a fini de répondre | content (« Done! », projet en ligne 2), temporaire | clochette |
 | `claude_waiting` | Une Session attend une réponse ou une autorisation | interpelle, qui reste le point de retour tant que la Session attend | carillon |
 | `claude_working` | On a répondu à une Session, elle reprend son travail | aucune ; si cette Session attendait, interpelle passe à la Session suivante qui attend, sinon s'en va | — |
 | `claude_end` | Une Session s'est fermée | aucune : la Session est oubliée (comme `claude_working` si elle attendait) | — |

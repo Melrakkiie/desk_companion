@@ -177,6 +177,8 @@ static void lignesBandeau(const char* texte, const char* artiste, char* l1, char
   etatVersCp437(saut != nullptr ? saut + 1 : artiste, l2, TEXTE_MAX + 1);
 }
 
+static const char* const LIBELLE_FINI = "Done!";  // ligne 1 du Bandeau d'une Session qui a fini
+
 static void installer(Expression expression, const char* texte, bool temporaire,
                       unsigned long maintenantMs, unsigned long dureeMs,
                       const char* artiste = nullptr) {
@@ -278,7 +280,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
       Session& s = sessionPour(session, maintenantMs);
       majSession(s, CLAUDE_FINI, texte, maintenantMs);
       demarrerSon(SON_CLOCHETTE, maintenantMs);
-      installer(EXPR_CONTENT, texte, true, maintenantMs, DUREE_CLAUDE_DONE_MS);
+      installer(EXPR_CONTENT, LIBELLE_FINI, true, maintenantMs, DUREE_CLAUDE_DONE_MS, texte);  // projet en ligne 2
       return true;
     }
     case EV_GIT_PUSH:
@@ -416,7 +418,7 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     rappel.ligne2[0] = '\0';
   } else {
     if (rappel.expression != EXPR_INTERPELLE) {  // le texte d'une Session qui travaille ou a fini est son projet : ligne 2
-      etatVersCp437(rappel.expression == EXPR_TRAVAILLE ? "Working" : "Done!", rappel.texte, TEXTE_MAX + 1);
+      etatVersCp437(rappel.expression == EXPR_TRAVAILLE ? "Working" : LIBELLE_FINI, rappel.texte, TEXTE_MAX + 1);
       etatVersCp437(s->texte, rappel.ligne2, TEXTE_MAX + 1);
     } else {
       lignesBandeau(s->texte, nullptr, rappel.texte, rappel.ligne2);
