@@ -299,6 +299,10 @@ static void test_music_duree_avec_deux_lignes_dans_le_texte() {
 // Signe de vie du PC (music_stop) : empêche le Sommeil sans toucher aux Sessions.
 static void signe_de_vie(unsigned long ms) { etatRecevoir(EV_MUSIC_STOP, nullptr, ms); }
 
+// Une Expression temporaire (git_push) prend l'affichage : l'Expression courante n'est plus interpelle,
+// donc le Bouton Claude montre le Rappel au lieu de chasser la Session.
+static void quitter_interpelle(unsigned long ms) { etatRecevoir(EV_GIT_PUSH, "main\nprojet", ms); }
+
 static void test_waiting_persistante_ne_revient_jamais_seule() {
   etatInit();
   assert(etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?", 100));
@@ -819,9 +823,10 @@ static void test_session_muette_12h_est_oubliee() {
   assert(!etatMiseAJour(OUBLI_SESSION_MS - 1));  // f encore connue
   signe_de_vie(OUBLI_SESSION_MS - 1);
   assert(!etatMiseAJour(OUBLI_SESSION_MS));      // f oubliée, l'affichage (A) ne change pas
-  etatBouton(true, OUBLI_SESSION_MS + 1);  // un Rappel par-dessus interpelle (le Bouton Claude chasserait A)
-  assert(etatCourant().expression == EXPR_SILENCE);
-  etatBouton(false, OUBLI_SESSION_MS + 100);
+  quitter_interpelle(OUBLI_SESSION_MS);  // sinon le Bouton Claude chasserait A au lieu de montrer le Rappel
+  etatBoutonClaude(true, OUBLI_SESSION_MS + 1);
+  assert(strcmp(etatCourant().texte, "A") == 0);  // plus de « +1 »
+  etatBoutonClaude(false, OUBLI_SESSION_MS + 100);
   signe_de_vie(OUBLI_SESSION_MS + 500);
   assert(!etatMiseAJour(OUBLI_SESSION_MS + 1000));  // A oubliée sous le Rappel : pas encore visible
   signe_de_vie(OUBLI_SESSION_MS + 2000);
@@ -909,7 +914,7 @@ static void test_bouton_claude_sans_session_sans_claude_3s_puis_retour() {
 static void test_bouton_claude_attend_interpelle_avec_libelle_et_projet() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nprojet-a", 500, nullptr, "a");
-  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 600);  // Expression temporaire au-dessus de l'attente : pas de chasse
+  quitter_interpelle(600);
   assert(etatBoutonClaude(true, 1000));
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().texte, "autorisation ?") == 0);
@@ -924,7 +929,7 @@ static void test_bouton_claude_attend_la_plus_recente_avant_fini() {
   etatRecevoir(EV_CLAUDE_WAITING, "libelle A\nprojet-a", 100, nullptr, "a");
   etatRecevoir(EV_CLAUDE_DONE, "projet-b", 200, nullptr, "b");
   etatRecevoir(EV_CLAUDE_WAITING, "libelle C\nprojet-c", 300, nullptr, "c");
-  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 350);  // pas interpelle : le Bouton Claude montre le Rappel
+  quitter_interpelle(350);
   etatBoutonClaude(true, 1000);
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
@@ -1082,7 +1087,7 @@ static void test_bouton_claude_attend_avant_travaille() {
   etatInit();
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-a", 100, nullptr, "a");
   etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 200, nullptr, "b");
-  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 900);  // pas interpelle : le Bouton Claude montre le Rappel
+  quitter_interpelle(900);
   etatBoutonClaude(true, 1000);
   assert(etatCourant().expression == EXPR_INTERPELLE);
   assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
@@ -1128,7 +1133,7 @@ static void test_bouton_claude_compteur_autres_sessions() {
   assert(strcmp(etatCourant().ligne2, "projet-b") == 0);
   etatBoutonClaude(false, 2100);
   etatRecevoir(EV_CLAUDE_WAITING, "libelle\nprojet-c", 2200, nullptr, "c");
-  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 2900);  // pas interpelle : le Bouton Claude montre le Rappel
+  quitter_interpelle(2900);
   etatBoutonClaude(true, 3000);
   assert(strcmp(etatCourant().texte, "libelle  \xB3 3 sessions") == 0);
   assert(strcmp(etatCourant().ligne2, "projet-c") == 0);
@@ -1147,17 +1152,17 @@ static void test_bouton_claude_compteur_ne_deborde_pas_la_ligne() {
   long_[sizeof(long_) - 1] = '\0';
   etatRecevoir(EV_CLAUDE_DONE, "b", 100, nullptr, "b");
   etatRecevoir(EV_CLAUDE_WAITING, "permission\nprojet", 200, nullptr, "c");
-  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 900);  // pas interpelle : le Bouton Claude montre le Rappel
+  quitter_interpelle(900);
   etatBoutonClaude(true, 1000);
   assert(strcmp(etatCourant().texte, "permission\xB3" "2 sessions") == 0);  // à l'étroit : sans espace après « │ »
   etatBoutonClaude(false, 1100);
   etatRecevoir(EV_CLAUDE_WAITING, "autorisation ?\nprojet", 1200, nullptr, "c");
-  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 1900);
+  quitter_interpelle(1900);
   etatBoutonClaude(true, 2000);
   assert(strcmp(etatCourant().texte, "autorisation ? \xB3 2 sessions") == 0);  // trop long : à la suite, défile
   etatBoutonClaude(false, 2100);
   etatRecevoir(EV_CLAUDE_WAITING, long_, 2200, nullptr, "c");
-  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 2900);
+  quitter_interpelle(2900);
   etatBoutonClaude(true, 3000);
   assert(strlen(etatCourant().texte) <= TEXTE_MAX);
   assert(strcmp(etatCourant().texte + strlen(etatCourant().texte) - 13, " \xB3 2 sessions") == 0);

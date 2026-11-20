@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Hook Claude Code -> Compagnon. Lit le JSON du hook sur l'entrée, envoie l'Événement
-# correspondant en POST /event, sans jamais échouer ; au plus 3 s d'attente (fin de tour), sinon aucune.
+# correspondant en POST /event, sans jamais échouer ; attente de la réponse : au plus 3 s (Stop, StopFailure), 1 s
+# (les autres, dont PostToolUse AskUserQuestion) ; seul le PostToolUse ordinaire est détaché, sans attente.
 #
 # Cible : http://compagnon.local, remplaçable par la variable COMPAGNON_URL (tests).
 # Le session_id du hook part dans le champ "session" : le Compagnon suit chaque Session
@@ -33,12 +34,12 @@ finit_sur_question() {
 
 # Durée d'attente de la réponse en s ; 0 : envoi détaché. Par défaut le script attend : un envoi détaché
 # se perd (Claude Code tue vraisemblablement les processus du hook à sa sortie, le Compagnon est lent).
-attendre=$delai_fin_s
+duree_attente_s=$delai_fin_s
 case "$(champ .hook_event_name)" in
   Stop)
-    attendre=$delai_tour_s
+    duree_attente_s=$delai_tour_s
     if finit_sur_question; then type=claude_waiting; texte=$hey; else type=claude_done; texte=$projet; fi ;;
-  StopFailure) attendre=$delai_tour_s; type=claude_done; texte=$projet ;;  # tour fini sur une erreur d'API : aucune question
+  StopFailure) duree_attente_s=$delai_tour_s; type=claude_done; texte=$projet ;;  # tour fini sur une erreur d'API : aucune question
   Notification)
     type=claude_waiting
     case "$(champ .notification_type)" in
@@ -55,7 +56,7 @@ case "$(champ .hook_event_name)" in
   UserPromptSubmit) type=claude_working; texte=$projet ;;
   PostToolUse)  # dizaines par minute : détaché, sauf après une question à choix (efface le Hey?)
     type=claude_working; texte=$projet
-    [ "$(champ .tool_name)" = AskUserQuestion ] || attendre=0 ;;
+    [ "$(champ .tool_name)" = AskUserQuestion ] || duree_attente_s=0 ;;
   SessionEnd) type=claude_end; texte=$projet ;;  # la Session fermée n'est plus suivie
   *) exit 0 ;;
 esac
@@ -69,5 +70,5 @@ envoyer() {
     -d "$corps" "${COMPAGNON_URL:-http://compagnon.local}/event" >/dev/null 2>&1
 }
 
-if [ "$attendre" != 0 ]; then envoyer "$attendre"; else ( envoyer "$delai_curl_s" & ) >/dev/null 2>&1; fi
+if [ "$duree_attente_s" != 0 ]; then envoyer "$duree_attente_s"; else ( envoyer "$delai_curl_s" & ) >/dev/null 2>&1; fi
 exit 0
