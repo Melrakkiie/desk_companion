@@ -14,8 +14,27 @@ entree=$(cat)
 champ() { printf '%s' "$entree" | jq -r "$1 // empty" 2>/dev/null; }
 
 projet=$(basename "$(champ .cwd)")
+
+# Le texte final de Claude m'adresse-t-il une question ? (❓, ligne « needs input: »,
+# ou dernier paragraphe hors blocs de code terminé par « ? »). Limite : pas d'analyse du sens.
+attend() {
+  local msg; msg=$(champ .last_assistant_message)
+  [[ $msg == *❓* ]] && return 0
+  printf '%s\n' "$msg" | grep -q '^needs input:' && return 0
+  printf '%s\n' "$msg" | awk '
+    /^```/ { c = !c; if (p != "") d = p; p = ""; next }
+    c { next }
+    /[^[:space:]]/ { p = p $0; next }
+    { if (p != "") d = p; p = "" }
+    END { if (p != "") d = p; exit !(d ~ /\?[[:space:]]*$/) }'
+}
+
+attendre=0  # 1 : envoi qui attend la réponse (fin de tour)
 case "$(champ .hook_event_name)" in
-  Stop | StopFailure) type=claude_done; texte=$projet ;;  # StopFailure : tour fini sur une erreur d'API
+  Stop)
+    attendre=1
+    if attend; then type=claude_waiting; texte="Hey?"$'\n'"$projet"; else type=claude_done; texte=$projet; fi ;;
+  StopFailure) type=claude_done; texte=$projet ;;  # tour fini sur une erreur d'API : aucune question
   Notification)
     type=claude_waiting
     case "$(champ .notification_type)" in
@@ -44,7 +63,8 @@ case "$type" in
   # des hooks vraisemblablement tués à la fin du tour). On attend la réponse, au plus 1 s
   # (budget SessionEnd : 1,5 s).
   claude_done | claude_end) envoyer "$delai_fin_s" ;;
-  # Le reste (dizaines de PostToolUse par minute) part détaché pour rendre la main tout de suite.
-  *) ( envoyer "$delai_curl_s" & ) >/dev/null 2>&1 ;;
+  # Le reste (dizaines de PostToolUse par minute) part détaché pour rendre la main tout de suite,
+  # sauf le claude_waiting d'une fin de tour (Stop), attendu comme claude_done.
+  *) if [ "$attendre" = 1 ]; then envoyer "$delai_fin_s"; else ( envoyer "$delai_curl_s" & ) >/dev/null 2>&1; fi ;;
 esac
 exit 0
