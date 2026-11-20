@@ -206,6 +206,16 @@ static void retour(unsigned long maintenantMs) {
   else repos();
 }
 
+// Oublie la Session (claude_end ou oubli après OUBLI_SESSION_MS) ; si c'était la Session affichée,
+// passage au point de retour, sans carillon. Vrai si l'Expression a changé.
+static bool oublierSession(Session& s, unsigned long maintenantMs) {
+  bool affichee = s.etat == CLAUDE_ATTEND && attenteLaPlusRecente() == &s;
+  s.utilisee = false;
+  if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
+  retour(maintenantMs);
+  return true;
+}
+
 // Oublie le Jeu courant (game_stop ou oubli après OUBLI_JEU_MS) ; vrai si l'Expression Jeu cède la place au Repos.
 static bool oublierJeu() {
   jeuConnu = false;
@@ -337,12 +347,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     // seulement si c'était la Session affichée : passage au point de retour, sans carillon.
     case EV_CLAUDE_END: {
       Session* s = sessionConnue(session);
-      if (s == nullptr) return false;
-      bool affichee = s->etat == CLAUDE_ATTEND && attenteLaPlusRecente() == s;
-      s->utilisee = false;
-      if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
-      retour(maintenantMs);
-      return true;
+      return s != nullptr && oublierSession(*s, maintenantMs);
     }
   }
   return false;  // inatteignable : tous les types sont traités ci-dessus
@@ -363,6 +368,9 @@ bool etatMiseAJour(unsigned long maintenantMs) {
   if (jeuConnu && maintenantMs - nouvellesJeuMs >= OUBLI_JEU_MS) {  // même effet qu'un game_stop
     if (oublierJeu()) visible = !rappelActif;
   }
+  for (Session& s : sessions)  // même effet qu'un claude_end (Session tuée sans SessionEnd)
+    if (s.utilisee && maintenantMs - s.changementMs >= OUBLI_SESSION_MS && oublierSession(s, maintenantMs))
+      visible = !rappelActif;
   if (rappelActif && maintenantMs - rappel.debutMs >= rappel.dureeMs) {
     rappelActif = false;
     visible = true;
