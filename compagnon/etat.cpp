@@ -53,6 +53,14 @@ static Session& sessionPour(const char* id, unsigned long maintenantMs) {
   return s;
 }
 
+// Session déjà connue, ou nullptr (ne crée rien).
+static Session* sessionConnue(const char* id) {
+  if (id == nullptr) id = "";
+  for (Session& s : sessions)
+    if (s.utilisee && strncmp(s.id, id, SESSION_ID_MAX) == 0) return &s;
+  return nullptr;
+}
+
 // Session qui attend depuis le plus récent changement, ou nullptr. Égalité d'instant : la dernière de la table.
 static const Session* attenteLaPlusRecente() {
   const Session* res = nullptr;
@@ -193,7 +201,7 @@ void etatInit(bool boutonEnfonceAuDemarrage) {
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
-  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop"};
+  static const char* const NOMS[] = {"claude_done", "claude_waiting", "claude_working", "music", "git_push", "music_stop", "game", "game_stop", "claude_end"};
   if (nom == nullptr) return false;
   for (unsigned i = 0; i < sizeof(NOMS) / sizeof(*NOMS); i++) {
     if (strcmp(nom, NOMS[i]) == 0) {
@@ -303,6 +311,17 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     }
     case EV_GAME_STOP:
       return oublierJeu();
+    // Oublie la Session (inconnue : sans effet, sans lui prendre de place) ; change l'affichage
+    // seulement si c'était la Session affichée : passage au point de retour, sans carillon.
+    case EV_CLAUDE_END: {
+      Session* s = sessionConnue(session);
+      if (s == nullptr) return false;
+      bool affichee = s->etat == CLAUDE_ATTEND && attenteLaPlusRecente() == s;
+      s->utilisee = false;
+      if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
+      retour(maintenantMs);
+      return true;
+    }
   }
   return false;  // inatteignable : tous les types sont traités ci-dessus
 }

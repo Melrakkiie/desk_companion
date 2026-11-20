@@ -11,6 +11,9 @@
     ],
     "PostToolUse": [
       { "hooks": [ { "type": "command", "command": "$HOME/Projects/esp32/desk_companion/hooks/compagnon-hook.sh" } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "$HOME/Projects/esp32/desk_companion/hooks/compagnon-hook.sh" } ] }
     ]
   }
 }

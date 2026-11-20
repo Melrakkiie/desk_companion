@@ -24,6 +24,7 @@ case "$(champ .hook_event_name)" in
       *) exit 0 ;;  # autres notifications : rien à signaler
     esac ;;
   UserPromptSubmit | PostToolUse) type=claude_working; texte=$projet ;;
+  SessionEnd) type=claude_end; texte=$projet ;;  # la Session fermée n'est plus suivie
   *) exit 0 ;;
 esac
 
