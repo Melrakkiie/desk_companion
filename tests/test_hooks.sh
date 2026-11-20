@@ -47,9 +47,33 @@ verifie "Notification autorisation -> claude_waiting" \
 verifie "Notification idle_prompt (Session qui a fini) -> rien envoyé" \
   '{"hook_event_name":"Notification","notification_type":"idle_prompt","session_id":"s1","cwd":"/x/mon_projet"}' \
   ''
+verifie "PreToolUse AskUserQuestion -> claude_waiting" \
+  '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","session_id":"s1","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_waiting","text":"Hey?\nmon_projet","session":"s1"}'
+verifie "PreToolUse d'un autre outil -> rien envoyé" \
+  '{"hook_event_name":"PreToolUse","tool_name":"Bash","session_id":"s1","cwd":"/x/mon_projet"}' \
+  ''
+verifie "Notification elicitation_dialog -> claude_waiting" \
+  '{"hook_event_name":"Notification","notification_type":"elicitation_dialog","session_id":"s1","cwd":"/x/mon_projet"}' \
+  '/event application/json {"type":"claude_waiting","text":"Hey?\nmon_projet","session":"s1"}'
 verifie "Notification d'un autre type -> rien envoyé" \
   '{"hook_event_name":"Notification","notification_type":"auth_success","session_id":"s1","cwd":"/x/mon_projet"}' \
   ''
+
+# Fin de tour sur une question : « attend » (last_assistant_message).
+ATTEND='/event application/json {"type":"claude_waiting","text":"Hey?\nmon_projet","session":"s1"}'
+FINI='/event application/json {"type":"claude_done","text":"mon_projet","session":"s1"}'
+# stop <événement> <texte> : les \n du texte deviennent de vrais sauts de ligne, jq échappe le JSON.
+stop() { jq -nc --arg e "$1" --arg m "$(printf '%b' "$2")" \
+  '{hook_event_name: $e, session_id: "s1", cwd: "/x/mon_projet", last_assistant_message: $m}'; }
+verifie "Stop avec ❓ -> claude_waiting" "$(stop Stop 'Round 1\n❓ Quel nom ?\n➡️ je propose X')" "$ATTEND"
+verifie "Stop avec ligne needs input: -> claude_waiting" "$(stop Stop 'Job bloqué\nneeds input: choisis une option\nfin.')" "$ATTEND"
+verifie "Stop dont le dernier paragraphe finit par ? -> claude_waiting" "$(stop Stop 'Fait.\n\nTu veux que je pousse ?  \n\n')" "$ATTEND"
+verifie "Stop avec ? seulement dans un bloc de code -> claude_done" "$(stop Stop 'Voici :\n\n```\ncurl http://x?a=1\n```')" "$FINI"
+verifie "Stop avec bloc de code non fermé contenant ? -> claude_done" "$(stop Stop 'Voici :\n\n```\ncurl http://x?a=1 ?')" "$FINI"
+verifie "Stop avec ? dans un paragraphe non final -> claude_done" "$(stop Stop 'Tu veux ça ?\n\nJ ai fini.')" "$FINI"
+verifie "Stop avec texte vide -> claude_done" "$(stop Stop '')" "$FINI"
+verifie "StopFailure avec ? -> claude_done" "$(stop StopFailure 'Erreur ?')" "$FINI"
 verifie "UserPromptSubmit -> claude_working" \
   '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_working","text":"mon_projet","session":"s1"}'
@@ -70,6 +94,9 @@ for evt in Stop StopFailure SessionEnd; do
   printf '%s' "{\"hook_event_name\":\"$evt\",\"session_id\":\"s1\",\"cwd\":\"/x/p\"}" | bash "$HOOK"
   if [ -s "$TMP/log" ]; then echo "ok   $evt envoyé avant de rendre la main"; else echo "ECHEC $evt : rien reçu au retour du hook"; echec=1; fi
 done
+: > "$TMP/log"
+stop Stop 'Ok ?' | bash "$HOOK"
+if [ -s "$TMP/log" ]; then echo "ok   Stop claude_waiting envoyé avant de rendre la main"; else echo "ECHEC Stop claude_waiting : rien reçu au retour du hook"; echec=1; fi
 
 # Cible injoignable : le script rend la main vite, code 0, sans rien écrire.
 # temps_max_ms <nom> <événement> <limite en ms>

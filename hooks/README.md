@@ -30,12 +30,26 @@ curl -X POST -H 'Content-Type: application/json' -d '{"type":"music","text":"Tit
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"git_push","text":"main"}' http://compagnon.local/event
 ```
 
-`Stop` et `StopFailure` (tour fini sur une erreur d'API) envoient `claude_done`. Pour ces Événements de fin
-et `claude_end`, le script attend la réponse (au plus 1 s) : envoyé détaché, le `claude_done` du `Stop` n'arrivait pas
-(processus des hooks vraisemblablement tués à la fin du tour). Les autres partent détachés, sans attente.
-Seule la notification
-`permission_prompt` envoie `claude_waiting` (`idle_prompt`, « saisie inactive depuis ~60 s », est ignorée :
-elle arrive aussi quand la Session n'attend rien). Limite connue : une interruption (Échap) ne déclenche aucun
+`StopFailure` (tour fini sur une erreur d'API) envoie `claude_done`. `Stop` lit le texte final de Claude
+(`last_assistant_message`) et envoie `claude_waiting` (« Hey? », projet en ligne 2) si la Session termine sur une
+question qui t'est adressée, sinon `claude_done`. Critères, un seul suffit :
+- le texte contient `❓` ;
+- une de ses lignes commence par `needs input:` ;
+- son dernier paragraphe non vide, blocs de code (```) retirés, se termine par `?` (espaces en fin ignorés).
+
+Texte absent ou vide : `claude_done`. Limite : pas d'analyse du sens, donc un `?` final qui ne demande rien
+donne un faux « Hey? » (rare ; l'attente s'efface à ta prochaine saisie).
+`Stop`, `StopFailure` et `SessionEnd` envoient en attendant la réponse (au plus 1 s) : détaché, le `claude_done`
+du `Stop` n'arrivait pas (processus des hooks vraisemblablement tués à la fin du tour). Tous les autres
+Événements partent détachés, sans attente.
+
+`claude_waiting` (« Hey? » puis le projet) part aussi dans ces cas : notification `permission_prompt`
+(autorisation), notification `elicitation_dialog` (saisie demandée par un serveur MCP), et `PreToolUse` de
+l'outil `AskUserQuestion` (question à choix). Pour ce dernier, il faut l'entrée `PreToolUse` avec le matcher
+`AskUserQuestion` de `settings-extrait.json` ; tout autre `PreToolUse` est ignoré. L'attente
+s'efface au `PostToolUse` suivant (`claude_working`), à vérifier en réel : la doc ne confirme pas que
+`PostToolUse` se déclenche après `AskUserQuestion`. `idle_prompt`, « saisie inactive depuis ~60 s », est
+ignorée : elle arrive aussi quand la Session n'attend rien. Limite connue : une interruption (Échap) ne déclenche aucun
 hook, la Session reste « travaille » jusqu'à son prochain Événement.
 
 Les Événements Claude portent le `session_id` du hook dans `session` (chaîne, facultatif : absent = Session anonyme) ; le Compagnon suit l'attente de chaque Session séparément.

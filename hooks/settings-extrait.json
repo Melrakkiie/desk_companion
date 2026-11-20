@@ -12,6 +12,9 @@
     "UserPromptSubmit": [
       { "hooks": [ { "type": "command", "command": "$HOME/Projects/esp32/desk_companion/hooks/compagnon-hook.sh" } ] }
     ],
+    "PreToolUse": [
+      { "matcher": "AskUserQuestion", "hooks": [ { "type": "command", "command": "$HOME/Projects/esp32/desk_companion/hooks/compagnon-hook.sh" } ] }
+    ],
     "PostToolUse": [
       { "hooks": [ { "type": "command", "command": "$HOME/Projects/esp32/desk_companion/hooks/compagnon-hook.sh" } ] }
     ],
