@@ -1228,7 +1228,59 @@ static void test_bouton_claude_chasse_vers_jeu_quand_un_jeu_tourne() {
   assert(etatCourant().expression == EXPR_JEU);
 }
 
+static void test_bouton_claude_deux_sessions_attendent_chasse_une_a_la_fois_sans_carillon() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-b", 200, nullptr, "b");
+  assert(etatBoutonClaude(true, 100000));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+  assert(etatFrequence(100000) == 0);  // pas de carillon
+  assert(!etatBoutonClaude(true, 100100));  // maintenu : une seule Session chassée
+  etatBoutonClaude(false, 100200);
+  assert(etatBoutonClaude(true, 101000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_claude_session_chassee_reste_suivie_en_fini() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WORKING, "projet-b", 150, nullptr, "b");
+  etatBoutonClaude(true, 1000);
+  etatBoutonClaude(false, 1100);
+  assert(etatBoutonClaude(true, 2000));  // plus interpelle : Rappel Claude, B travaille
+  assert(etatCourant().expression == EXPR_TRAVAILLE);
+  etatBoutonClaude(false, 2100);
+  etatRecevoir(EV_CLAUDE_END, nullptr, 2200, nullptr, "b");
+  assert(etatBoutonClaude(true, 3000));
+  assert(etatCourant().expression == EXPR_CONTENT);
+  assert(strcmp(etatCourant().texte, "Done!") == 0);
+  assert(strcmp(etatCourant().ligne2, "projet-a") == 0);
+}
+
+static void test_bouton_claude_chasse_met_fin_au_rappel_musique_au_dessus_d_interpelle() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  assert(etatBouton(true, 1000));
+  assert(etatCourant().expression == EXPR_SILENCE);
+  assert(etatBoutonClaude(true, 1500));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_bouton_claude_session_chassee_qui_attend_a_nouveau_interpelle_avec_carillon() {
+  etatInit();
+  etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 100, nullptr, "a");
+  etatBoutonClaude(true, 100000);
+  assert(etatRecevoir(EV_CLAUDE_WAITING, "Hey?\nprojet-a", 105000, nullptr, "a"));
+  assert(etatCourant().expression == EXPR_INTERPELLE);
+  assert(etatFrequence(105000) != 0);
+}
+
 int main() {
+  test_bouton_claude_deux_sessions_attendent_chasse_une_a_la_fois_sans_carillon();
+  test_bouton_claude_session_chassee_reste_suivie_en_fini();
+  test_bouton_claude_chasse_met_fin_au_rappel_musique_au_dessus_d_interpelle();
+  test_bouton_claude_session_chassee_qui_attend_a_nouveau_interpelle_avec_carillon();
   test_bouton_claude_pendant_interpelle_chasse_la_session_vers_repos_sans_son_ni_rappel();
   test_bouton_claude_chasse_vers_jeu_quand_un_jeu_tourne();
   test_end_de_la_session_affichee_passe_a_la_suivante_sans_carillon();
