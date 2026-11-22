@@ -265,10 +265,34 @@ jeuConnu = false;
   endormi = false;
   wifiPrecedent = true;
   dernierEvenementMs = 0;
+  potentiometreLu = false;
+  volume = 100;
   memset(sessions, 0, sizeof(sessions));
   // tenu au démarrage : pas de front d'appui
   boutonMusique = {boutonMusiqueEnfonceAuDemarrage, false, 0};
   boutonClaude = {boutonClaudeEnfonceAuDemarrage, false, 0};
+}
+
+// Potentiomètre : zones mortes (butées exactes malgré le bruit) et seuil d'hystérésis, en unités brutes 0-4095.
+static const int ZONE_MORTE_BRUT = 50;
+static const int SEUIL_BRUIT_BRUT = 40;
+static bool potentiometreLu = false;
+static int potentiometreRetenu = 0;
+static int volume = 100;
+
+int etatVolume() { return volume; }
+
+bool etatPotentiometre(int lectureBrute, unsigned long /*maintenantMs*/) {
+  int plein = 4095 - ZONE_MORTE_BRUT;
+  bool zoneMorte = lectureBrute <= ZONE_MORTE_BRUT || lectureBrute >= plein;
+  int ecart = lectureBrute - potentiometreRetenu;
+  if (potentiometreLu && !zoneMorte && ecart > -SEUIL_BRUIT_BRUT && ecart < SEUIL_BRUIT_BRUT) return false;
+  potentiometreLu = true;
+  potentiometreRetenu = lectureBrute;
+  if (lectureBrute <= ZONE_MORTE_BRUT) volume = 0;
+  else if (lectureBrute >= plein) volume = 100;
+  else volume = 100 * (lectureBrute - ZONE_MORTE_BRUT) / (plein - ZONE_MORTE_BRUT);
+  return false;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
