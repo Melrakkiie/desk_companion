@@ -284,17 +284,29 @@ static const int SEUIL_BRUIT_BRUT = 40;
 
 int etatVolume() { return volume; }
 
-bool etatPotentiometre(int lectureBrute, unsigned long /*maintenantMs*/) {
+bool etatPotentiometre(int lectureBrute, unsigned long maintenantMs) {
   int plein = 4095 - ZONE_MORTE_BRUT;
   bool zoneMorte = lectureBrute <= ZONE_MORTE_BRUT || lectureBrute >= plein;
   int ecart = lectureBrute - potentiometreRetenu;
   if (potentiometreLu && !zoneMorte && ecart > -SEUIL_BRUIT_BRUT && ecart < SEUIL_BRUIT_BRUT) return false;
+  bool premiere = !potentiometreLu;
+  int ancien = volume;
   potentiometreLu = true;
   potentiometreRetenu = lectureBrute;
   if (lectureBrute <= ZONE_MORTE_BRUT) volume = 0;
   else if (lectureBrute >= plein) volume = 100;
   else volume = 100 * (lectureBrute - ZONE_MORTE_BRUT) / (plein - ZONE_MORTE_BRUT);
-  return false;
+  // Un mouvement = le Volume change (le bruit en butée ne le change pas) ; ce n'est pas un Événement :
+  // ni réveil ni délai de Sommeil remis à zéro.
+  if (premiere || volume == ancien) return false;
+  rappel.expression = EXPR_VOLUME;
+  rappel.texte[0] = '\0';
+  rappel.ligne2[0] = '\0';
+  rappel.dureeMs = DUREE_RAPPEL_VOLUME_MS;
+  rappel.temporaire = true;
+  rappel.debutMs = maintenantMs;
+  rappelActif = true;
+  return true;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {

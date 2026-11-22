@@ -678,6 +678,105 @@ static void test_volume_butee_de_pres_sans_sauter_la_zone_morte() {
   assert(etatVolume() == 0);
 }
 
+// ---- Rappel volume (ticket #83) ----
+
+static void test_rappel_volume_mouvement_net_puis_fin_2s_apres_le_dernier() {
+  etatInit();
+  assert(!etatPotentiometre(2048, 100));  // première lecture : pas de Rappel
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(!etatPotentiometre(2052, 200));  // bruit : rien
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatPotentiometre(3000, 1000));  // mouvement net
+  assert(etatCourant().expression == EXPR_VOLUME);
+  assert(etatCourant().texte[0] == '\0' && etatCourant().ligne2[0] == '\0');
+  int v = etatVolume();
+  assert(etatPotentiometre(3500, 2500));  // repousse l'échéance
+  assert(etatVolume() > v);
+  assert(!etatMiseAJour(4499));
+  assert(etatCourant().expression == EXPR_VOLUME);
+  assert(etatMiseAJour(4500));            // exactement 2 s après le dernier mouvement
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_rappel_volume_bruit_seul_ne_l_affiche_jamais() {
+  etatInit();
+  etatPotentiometre(2048, 100);
+  assert(!etatPotentiometre(2060, 200));
+  assert(!etatPotentiometre(2040, 300));
+  assert(!etatPotentiometre(2055, 400));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_rappel_volume_butees_atteintes_le_montrent_une_fois_sans_scintiller() {
+  etatInit();
+  etatPotentiometre(2048, 100);
+  assert(etatPotentiometre(5, 1000));    // butée basse atteinte : Volume 0
+  assert(etatVolume() == 0);
+  assert(!etatPotentiometre(30, 1100));  // bruit en butée : pas un mouvement
+  assert(!etatPotentiometre(8, 1200));
+}
+
+static void test_rappel_volume_remplace_par_boutons_et_remplace_les_rappels() {
+  etatInit();
+  etatPotentiometre(2048, 100);
+  etatPotentiometre(3000, 1000);
+  assert(etatBouton(true, 1200));
+  assert(etatCourant().expression == EXPR_SILENCE);
+  etatBouton(false, 1300);
+  assert(etatPotentiometre(1000, 1500));  // la rotation remplace le Rappel musique
+  assert(etatCourant().expression == EXPR_VOLUME);
+  assert(etatBoutonClaude(true, 1700));
+  assert(etatCourant().expression != EXPR_VOLUME);
+  etatBoutonClaude(false, 1800);
+  assert(etatPotentiometre(3000, 2000));  // ... et un Rappel Claude
+  assert(etatCourant().expression == EXPR_VOLUME);
+}
+
+static void test_rappel_volume_un_evenement_qui_change_y_met_fin() {
+  etatInit();
+  etatPotentiometre(2048, 100);
+  etatPotentiometre(3000, 1000);
+  etatRecevoir(EV_GIT_PUSH, "main\nprojet", 1100);
+  assert(etatCourant().expression == EXPR_PUSH);
+}
+
+static void test_rappel_volume_pendant_le_sommeil_ne_reveille_pas_ni_ne_remet_le_delai() {
+  etatInit();
+  etatPotentiometre(2048, 0);
+  etatMiseAJour(DELAI_SOMMEIL_MS);
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  assert(etatPotentiometre(3000, DELAI_SOMMEIL_MS + 1000));
+  assert(etatCourant().expression == EXPR_VOLUME);
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS + 3000));  // fin du Rappel : retour à Endormi
+  assert(etatCourant().expression == EXPR_ENDORMI);
+  // délai non remis à zéro : un Événement quelconque réveille normalement, le délai court depuis lui seul
+  etatRecevoir(EV_CLAUDE_DONE, "projet", DELAI_SOMMEIL_MS + 4000);
+  assert(etatCourant().expression == EXPR_CONTENT);
+}
+
+static void test_rappel_volume_sous_interpelle_le_bouton_claude_chasse_la_session() {
+  etatInit();
+  etatPotentiometre(2048, 0);
+  etatRecevoir(EV_CLAUDE_WAITING, "projet", 100);
+  etatPotentiometre(3000, 1000);
+  assert(etatCourant().expression == EXPR_VOLUME);
+  assert(etatBoutonClaude(true, 1200));
+  assert(etatCourant().expression != EXPR_VOLUME);
+  assert(etatCourant().expression != EXPR_INTERPELLE);  // Session chassée : plus d'interpelle
+}
+
+static void test_rappel_volume_sans_son_et_n_interrompt_pas_un_son() {
+  etatInit();
+  etatPotentiometre(2048, 0);
+  etatPotentiometre(3000, 1000);
+  assert(etatSonCourant() == SON_AUCUN);
+  etatRecevoir(EV_CLAUDE_DONE, "projet", 2000);
+  Son s = etatSonCourant();
+  assert(s != SON_AUCUN);
+  etatPotentiometre(1000, 2100);
+  assert(etatSonCourant() == s);
+}
+
 static void test_bouton_nouvel_appui_relance_le_rappel() {
   etatInit();
   etatBouton(true, 1000);
@@ -1571,6 +1670,14 @@ int main() {
   test_volume_zones_mortes_butees_exactes_malgre_le_bruit();
   test_volume_bruit_ignore_variation_nette_prise_en_compte();
   test_volume_butee_de_pres_sans_sauter_la_zone_morte();
+  test_rappel_volume_mouvement_net_puis_fin_2s_apres_le_dernier();
+  test_rappel_volume_bruit_seul_ne_l_affiche_jamais();
+  test_rappel_volume_butees_atteintes_le_montrent_une_fois_sans_scintiller();
+  test_rappel_volume_remplace_par_boutons_et_remplace_les_rappels();
+  test_rappel_volume_un_evenement_qui_change_y_met_fin();
+  test_rappel_volume_pendant_le_sommeil_ne_reveille_pas_ni_ne_remet_le_delai();
+  test_rappel_volume_sous_interpelle_le_bouton_claude_chasse_la_session();
+  test_rappel_volume_sans_son_et_n_interrompt_pas_un_son();
   puts("Tous les tests passent.");
   return 0;
 }
