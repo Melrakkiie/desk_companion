@@ -229,8 +229,9 @@ static void dessinerVolume(const EtatCourant& e, unsigned long maintenantMs) {
   (void)maintenantMs;
   bouleCorps(0);
   bouleYeux(0, false, -3);
-  ecran.fillRect(2, 6, 4, 4, SSD1306_WHITE);                 // haut-parleur : caisse + cône
-  ecran.fillTriangle(6, 8, 12, 2, 12, 13, SSD1306_WHITE);
+  ecran.fillRect(2, 6, 4, 4, SSD1306_WHITE);  // haut-parleur : caisse (lignes 6 à 9)
+  // cône colonne par colonne, symétrique autour de la caisse (un triangle plein se rastérise de travers)
+  for (int i = 0; i < 4; i++) ecran.drawFastVLine(6 + i, 5 - i, 6 + 2 * i, SSD1306_WHITE);
   const int x = 20, largeur = 104;
   ecran.drawRect(x, 3, largeur, 10, SSD1306_WHITE);
   ecran.fillRect(x + 2, 5, (largeur - 4) * etatVolume() / 100, 6, SSD1306_WHITE);
