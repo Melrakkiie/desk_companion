@@ -2,21 +2,23 @@
 #include <Arduino.h>
 
 static const int BROCHE_BUZZER = 18;
-static const int RESOLUTION_BITS = 8;
-static const int DUTY_50_POURCENT = 1 << (RESOLUTION_BITS - 1);  // plein volume
+// 12 bits : assez fin pour les tout petits rapports cycliques (fréquence max = 80 MHz / 4096, bien au-dessus des notes).
+static const int RESOLUTION_BITS = 12;
 
 static unsigned int frequenceCourante = 0;
 static unsigned int dutyCourant = 0;
 
-// Volume 0-100 -> rapport cyclique : 0 = silence, 100 = 50 %. Un buzzer passif reste presque aussi fort de 50 %
-// jusqu'aux petits rapports et ne chute que près de 0 : la courbe quadratique passe l'essentiel de la course
-// dans les petits rapports pour que le volume perçu baisse à peu près régulièrement.
+// Rapport cyclique (sur 4096) par palier de Volume (0, 10, …, 100) : 0 = silence, 100 = 50 % (le volume d'avant).
+// Sur le montage, le buzzer passif sonne déjà presque à fond vers 2 % : les paliers 10 à 90 montent donc de 0,1 %
+// à ~2 % par pas de ×1,45 (même écart en dB à chaque cran, perçu comme régulier).
 // shortcut: réglée à l'oreille sur le vrai buzzer, pas mesurée.
+static const unsigned int DUTY_PAR_PALIER[11] = {0, 4, 6, 9, 13, 19, 28, 40, 58, 85, 2048};
+
 static unsigned int dutyDepuisVolume(int volume) {
-  if (volume <= 0) return 0;
-  if (volume >= 100) return DUTY_50_POURCENT;
-  unsigned int duty = (unsigned int)(DUTY_50_POURCENT * volume * volume / 10000);
-  return duty < 1 ? 1 : duty;
+  int palier = volume / 10;
+  if (palier < 0) palier = 0;
+  if (palier > 10) palier = 10;
+  return DUTY_PAR_PALIER[palier];
 }
 
 // API ledc du core ESP32 Arduino 3.x (ledcAttach/ledcWriteTone) ; en 2.x : ledcSetup + ledcAttachPin.

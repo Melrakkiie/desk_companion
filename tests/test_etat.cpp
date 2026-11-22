@@ -670,12 +670,39 @@ static void test_volume_bruit_ignore_variation_nette_prise_en_compte() {
   assert(etatVolume() < v - 15);
 }
 
-static void test_volume_butee_de_pres_sans_sauter_la_zone_morte() {
+static void test_volume_par_paliers_de_10() {
   etatInit();
-  etatPotentiometre(100, 100);  // volume faible mais supérieur à 0
-  assert(etatVolume() > 0);
-  etatPotentiometre(20, 110);   // écart < seuil mais en zone morte : 0 exact
-  assert(etatVolume() == 0);
+  for (int lecture = 0; lecture <= 4095; lecture += 37) {
+    etatPotentiometre(lecture, 100 + lecture);
+    assert(etatVolume() % 10 == 0);
+  }
+  etatInit();
+  etatPotentiometre(410, 100);   // un dixième de la course
+  assert(etatVolume() == 10);
+}
+
+static void test_volume_frontiere_de_palier_franchie_de_peu_ignoree() {
+  etatInit();
+  etatPotentiometre(2048, 100);  // milieu du palier 50
+  assert(etatVolume() == 50);
+  // plus près du palier 60 que du 50, mais pas assez loin du 50 : on reste
+  assert(!etatPotentiometre(2300, 200));
+  assert(etatVolume() == 50);
+  assert(etatCourant().expression == EXPR_REPOS);
+  assert(etatPotentiometre(2500, 300));  // nettement dans le palier 60
+  assert(etatVolume() == 60);
+}
+
+static void test_volume_bruit_a_cheval_sur_une_frontiere_ne_montre_jamais_le_rappel() {
+  etatInit();
+  etatPotentiometre(2250, 100);  // juste sous la frontière 50 / 60 : palier 50
+  int v = etatVolume();
+  // bruit mesuré sur le montage : pics d'environ ±60 autour de la position ; ici ±80
+  for (int i = 0; i < 200; i++) {
+    assert(!etatPotentiometre(2250 + (i % 2 ? 80 : -80), 200 + i * 10));
+    assert(etatVolume() == v);
+  }
+  assert(etatCourant().expression == EXPR_REPOS);
 }
 
 // ---- Rappel volume (ticket #83) ----
@@ -1692,7 +1719,9 @@ int main() {
   test_volume_premiere_lecture_fixe_le_volume_proportionnel();
   test_volume_zones_mortes_butees_exactes_malgre_le_bruit();
   test_volume_bruit_ignore_variation_nette_prise_en_compte();
-  test_volume_butee_de_pres_sans_sauter_la_zone_morte();
+  test_volume_par_paliers_de_10();
+  test_volume_frontiere_de_palier_franchie_de_peu_ignoree();
+  test_volume_bruit_a_cheval_sur_une_frontiere_ne_montre_jamais_le_rappel();
   test_rappel_volume_mouvement_net_puis_fin_2s_apres_le_dernier();
   test_rappel_volume_bruit_seul_ne_l_affiche_jamais();
   test_rappel_volume_butees_atteintes_le_montrent_une_fois_sans_scintiller();

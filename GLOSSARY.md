@@ -21,7 +21,7 @@ _À éviter_ : écran, mode, humeur.
 **Son** : une courte mélodie jouée par le buzzer du Compagnon en réaction à un Événement. Trois Sons existent : la **fanfare** (victoire, quelques secondes), le **carillon** (deux notes descendantes, « on t'attend ») et la **clochette** (trois notes montantes brèves, « c'est fini »).
 _À éviter_ : bip, alarme, notification.
 
-**Volume** : la force avec laquelle le buzzer joue les Sons, fixée à tout instant par la position du Potentiomètre, de muet (butée basse : aucun Son ne s'entend) à plein. Un Son en cours suit le Volume en direct.
+**Volume** : la force avec laquelle le buzzer joue les Sons, fixée à tout instant par la position du Potentiomètre, de muet (butée basse : aucun Son ne s'entend) à plein, par 10 paliers (le bruit de lecture ne fait pas changer de palier). Un Son en cours suit le Volume en direct.
 
 **Potentiomètre** : le bouton rotatif du Compagnon qui règle le Volume. Le tourner montre le Rappel volume ; ce n'est pas un Événement et ça ne réveille pas du Sommeil. Sa position au démarrage fixe le Volume sans rien montrer.
 _À éviter_ : molette, bouton de volume (« Bouton » est réservé aux deux boutons-poussoirs).

@@ -12,6 +12,13 @@ const int BROCHE_BOUTON_CLAUDE = 26;  // entre D26 et GND, lu comme le Bouton mu
 
 const int BROCHE_POTENTIOMETRE = 34;  // curseur du Potentiomètre (extrémités sur 3V3 et GND, jamais 5 V) ; ADC1, entrée seule
 
+// Moyenne de 16 lectures (~0,2 ms) : dilue les pics isolés de l'ADC avant les paliers de l'État.
+static int lirePotentiometre() {
+  int somme = 0;
+  for (int i = 0; i < 16; i++) somme += analogRead(BROCHE_POTENTIOMETRE);
+  return somme / 16;
+}
+
 static bool dernierEtatWifi = true;  // forcé à l'opposé au premier tour pour dessiner
 
 // Cadence du redessin périodique : PERIODE_ANIM_MS (etat.h).
@@ -36,7 +43,7 @@ void setup() {
   pinMode(BROCHE_BOUTON, INPUT_PULLUP);
   pinMode(BROCHE_BOUTON_CLAUDE, INPUT_PULLUP);
   etatInit(digitalRead(BROCHE_BOUTON) == LOW, digitalRead(BROCHE_BOUTON_CLAUDE) == LOW);
-  etatPotentiometre(analogRead(BROCHE_POTENTIOMETRE), millis());  // la position au démarrage fixe le Volume
+  etatPotentiometre(lirePotentiometre(), millis());  // la position au démarrage fixe le Volume
   buzzerInit();
   reseauInit();
   apiInit();
@@ -49,7 +56,7 @@ void loop() {
   aRedessiner |= etatMiseAJour(millis(), reseauConnecte());
   aRedessiner |= etatBouton(digitalRead(BROCHE_BOUTON) == LOW, millis());
   aRedessiner |= etatBoutonClaude(digitalRead(BROCHE_BOUTON_CLAUDE) == LOW, millis());
-  aRedessiner |= etatPotentiometre(analogRead(BROCHE_POTENTIOMETRE), millis());
+  aRedessiner |= etatPotentiometre(lirePotentiometre(), millis());
   buzzerJouer(etatFrequence(millis()), etatVolume());  // Son courant au Volume courant, sans bloquer la boucle
 
   bool connecte = reseauConnecte();
