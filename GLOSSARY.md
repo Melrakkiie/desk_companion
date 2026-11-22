@@ -14,12 +14,17 @@ _À éviter_ : notification, commande, message.
 **Expression** : ce que le Compagnon montre à l'écran à un instant donné : un visage, éventuellement accompagné d'un texte ou d'une animation.
 _À éviter_ : écran, mode, humeur.
 
-**Bandeau** : la bande jaune en haut de l'écran, réservée au texte d'une Expression (nom du projet, titre du morceau…). Vide au Repos, sauf pour signaler une coupure du Wi-Fi.
+**Bandeau** : la bande jaune en haut de l'écran, réservée au texte d'une Expression (nom du projet, titre du morceau…), sauf dans le Rappel volume où il montre la barre de Volume. Vide au Repos, sauf pour signaler une coupure du Wi-Fi.
 
 **Zone visage** : la partie bleue de l'écran, sous le Bandeau, où se dessinent le visage et les animations.
 
 **Son** : une courte mélodie jouée par le buzzer du Compagnon en réaction à un Événement. Trois Sons existent : la **fanfare** (victoire, quelques secondes), le **carillon** (deux notes descendantes, « on t'attend ») et la **clochette** (trois notes montantes brèves, « c'est fini »).
 _À éviter_ : bip, alarme, notification.
+
+**Volume** : la force avec laquelle le buzzer joue les Sons, fixée à tout instant par la position du Potentiomètre, de muet (butée basse : aucun Son ne s'entend) à plein. Un Son en cours suit le Volume en direct.
+
+**Potentiomètre** : le bouton rotatif du Compagnon qui règle le Volume. Le tourner montre le Rappel volume ; ce n'est pas un Événement et ça ne réveille pas du Sommeil. Sa position au démarrage fixe le Volume sans rien montrer.
+_À éviter_ : molette, bouton de volume (« Bouton » est réservé aux deux boutons-poussoirs).
 
 **Repos** : l'Expression par défaut, quand rien ne se passe, qu'aucune Session n'attend et qu'il n'y a pas de Jeu courant : la Boule qui sourit et cligne des yeux de temps en temps.
 
@@ -41,7 +46,7 @@ _À éviter_ : partie, jeu en cours.
 **Bouton** : un des deux boutons physiques du Compagnon, le **Bouton musique** ou le **Bouton Claude**. Un appui montre un Rappel, sauf l'appui sur le Bouton Claude pendant interpelle : il chasse la Session affichée (elle passe à « a fini », avec son projet seul, et le Compagnon revient au point de retour, sans Rappel ni Son). Un appui n'est pas un Événement : il ne vient pas du PC.
 _À éviter_ : touche, interrupteur.
 
-**Rappel** : ce que montre un appui sur un Bouton (sauf le Bouton Claude pendant interpelle), par-dessus l'Expression courante sans la remplacer, pendant une durée propre à son type et sans Son. Le **Rappel musique** (Bouton musique) montre ce qui joue : l'Expression musique du Morceau courant ou l'Expression vidéo de la Vidéo courante, sinon Silence (Endormi pendant le Sommeil). Le **Rappel Claude** (Bouton Claude) montre l'État Claude le plus urgent. À la fin du Rappel, le Compagnon revient à l'Expression courante. Un nouvel appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
+**Rappel** : ce que montre un appui sur un Bouton (sauf le Bouton Claude pendant interpelle) ou une rotation du Potentiomètre, par-dessus l'Expression courante sans la remplacer, pendant une durée propre à son type et sans Son. Le **Rappel musique** (Bouton musique) montre ce qui joue : l'Expression musique du Morceau courant ou l'Expression vidéo de la Vidéo courante, sinon Silence (Endormi pendant le Sommeil). Le **Rappel Claude** (Bouton Claude) montre l'État Claude le plus urgent. Le **Rappel volume** (Potentiomètre) montre Boule qui lève les yeux vers le Bandeau, où un haut-parleur et une barre disent le Volume : plus il est fort, plus la barre est remplie ; il dure tant qu'on tourne, puis 2 s. À la fin du Rappel, le Compagnon revient à l'Expression courante. Un nouvel appui, sur l'un ou l'autre Bouton, ou une rotation du Potentiomètre remplace le Rappel en cours.
 _À éviter_ : popup, superposition, aperçu.
 
 **Morceau courant** : le dernier morceau annoncé par `music`, tant que la lecture n'a pas été mise en pause ou arrêtée (`music_stop`). Il n'y en a pas toujours. Un morceau mis en pause reste connu du Compagnon : s'il reprend, il redevient Morceau courant sans être réaffiché. Le PC rappelle l'état de lecture toutes les 10 s ; sans nouvelles pendant 30 s, il n'y a plus de Morceau courant. Il n'y a jamais à la fois un Morceau courant et une Vidéo courante : l'un remplace l'autre.
