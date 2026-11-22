@@ -19,7 +19,17 @@ static void oublierSiPerime(unsigned long maintenantMs) {
   if (lectureConnue && maintenantMs - nouvellesLectureMs >= OUBLI_MORCEAU_MS) lectureConnue = false;
 }
 
-// Potentiomètre : dernière lecture retenue (hystérésis) et Volume 0-100.
+// Pose le Rappel (déjà rempli : expression, textes, dureeMs) : temporaire, à partir de maintenant, actif.
+static void poserRappel(unsigned long maintenantMs) {
+  rappel.temporaire = true;
+  rappel.debutMs = maintenantMs;
+  rappelActif = true;
+}
+
+// Potentiomètre : zones mortes (butées exactes malgré le bruit) et seuil d'hystérésis, en unités brutes 0-4095.
+static const int ZONE_MORTE_BRUT = 50;
+static const int SEUIL_BRUIT_BRUT = 40;
+// Dernière lecture retenue (hystérésis) et Volume 0-100.
 static bool potentiometreLu = false;
 static int potentiometreRetenu = 0;
 static int volume = 100;
@@ -278,10 +288,6 @@ jeuConnu = false;
   boutonClaude = {boutonClaudeEnfonceAuDemarrage, false, 0};
 }
 
-// Potentiomètre : zones mortes (butées exactes malgré le bruit) et seuil d'hystérésis, en unités brutes 0-4095.
-static const int ZONE_MORTE_BRUT = 50;
-static const int SEUIL_BRUIT_BRUT = 40;
-
 int etatVolume() { return volume; }
 
 bool etatPotentiometre(int lectureBrute, unsigned long maintenantMs) {
@@ -303,9 +309,7 @@ bool etatPotentiometre(int lectureBrute, unsigned long maintenantMs) {
   rappel.texte[0] = '\0';
   rappel.ligne2[0] = '\0';
   rappel.dureeMs = DUREE_RAPPEL_VOLUME_MS;
-  rappel.temporaire = true;
-  rappel.debutMs = maintenantMs;
-  rappelActif = true;
+  poserRappel(maintenantMs);
   return true;
 }
 
@@ -492,9 +496,7 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
     rappel.ligne2[0] = '\0';
     rappel.dureeMs = DUREE_SILENCE_MS;
   }
-  rappel.temporaire = true;
-  rappel.debutMs = maintenantMs;
-  rappelActif = true;
+  poserRappel(maintenantMs);
   return true;
 }
 
@@ -542,9 +544,7 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     }
   }
   rappel.dureeMs = DUREE_RAPPEL_CLAUDE_MS;
-  rappel.temporaire = true;
-  rappel.debutMs = maintenantMs;
-  rappelActif = true;
+  poserRappel(maintenantMs);
   return true;
 }
 

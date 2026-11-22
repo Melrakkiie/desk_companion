@@ -8,9 +8,10 @@ static const int DUTY_50_POURCENT = 1 << (RESOLUTION_BITS - 1);  // plein volume
 static unsigned int frequenceCourante = 0;
 static unsigned int dutyCourant = 0;
 
-// Volume 0-100 -> rapport cyclique : 0 = silence, 100 = 50 %. Courbe quadratique (l'oreille est
-// logarithmique, la moitié de la course doit donner à peu près la moitié du volume perçu).
-// Le rapport cyclique d'un buzzer passif agit mal en dessous de 50 % ; à régler à l'oreille sur le montage.
+// Volume 0-100 -> rapport cyclique : 0 = silence, 100 = 50 %. Un buzzer passif reste presque aussi fort de 50 %
+// jusqu'aux petits rapports et ne chute que près de 0 : la courbe quadratique passe l'essentiel de la course
+// dans les petits rapports pour que le volume perçu baisse à peu près régulièrement.
+// shortcut: réglée à l'oreille sur le vrai buzzer, pas mesurée.
 static unsigned int dutyDepuisVolume(int volume) {
   if (volume <= 0) return 0;
   if (volume >= 100) return DUTY_50_POURCENT;

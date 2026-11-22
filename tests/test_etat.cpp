@@ -672,7 +672,7 @@ static void test_volume_bruit_ignore_variation_nette_prise_en_compte() {
 
 static void test_volume_butee_de_pres_sans_sauter_la_zone_morte() {
   etatInit();
-  etatPotentiometre(100, 100);  // vol faible mais > 0
+  etatPotentiometre(100, 100);  // volume faible mais supérieur à 0
   assert(etatVolume() > 0);
   etatPotentiometre(20, 110);   // écart < seuil mais en zone morte : 0 exact
   assert(etatVolume() == 0);
@@ -714,6 +714,20 @@ static void test_rappel_volume_butees_atteintes_le_montrent_une_fois_sans_scinti
   assert(etatVolume() == 0);
   assert(!etatPotentiometre(30, 1100));  // bruit en butée : pas un mouvement
   assert(!etatPotentiometre(8, 1200));
+  // le bruit en butée, Rappel volume affiché, ne repousse pas son échéance (2 s après le dernier vrai mouvement)
+  assert(!etatMiseAJour(2999));
+  assert(etatMiseAJour(3000));
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_rappel_volume_s_affiche_sans_wifi() {
+  etatInit();
+  etatPotentiometre(2048, 0);
+  etatMiseAJour(500, false);
+  assert(etatPotentiometre(3000, 1000));
+  assert(etatCourant().expression == EXPR_VOLUME);
+  assert(etatMiseAJour(3000, false));
+  assert(etatCourant().expression == EXPR_REPOS);
 }
 
 static void test_rappel_volume_remplace_par_boutons_et_remplace_les_rappels() {
@@ -752,6 +766,15 @@ static void test_rappel_volume_pendant_le_sommeil_ne_reveille_pas_ni_ne_remet_le
   // délai non remis à zéro : un Événement quelconque réveille normalement, le délai court depuis lui seul
   etatRecevoir(EV_CLAUDE_DONE, "projet", DELAI_SOMMEIL_MS + 4000);
   assert(etatCourant().expression == EXPR_CONTENT);
+}
+
+static void test_rappel_volume_ne_remet_pas_le_delai_de_sommeil_a_zero_depuis_l_eveil() {
+  etatInit();
+  etatPotentiometre(2048, 0);
+  assert(etatPotentiometre(3000, DELAI_SOMMEIL_MS - 100));  // mouvement juste avant l'échéance
+  etatMiseAJour(DELAI_SOMMEIL_MS);                          // échéance d'origine : endormi sous le Rappel
+  assert(etatMiseAJour(DELAI_SOMMEIL_MS - 100 + DUREE_RAPPEL_VOLUME_MS));  // fin du Rappel
+  assert(etatCourant().expression == EXPR_ENDORMI);
 }
 
 static void test_rappel_volume_sous_interpelle_le_bouton_claude_chasse_la_session() {
@@ -1676,6 +1699,8 @@ int main() {
   test_rappel_volume_remplace_par_boutons_et_remplace_les_rappels();
   test_rappel_volume_un_evenement_qui_change_y_met_fin();
   test_rappel_volume_pendant_le_sommeil_ne_reveille_pas_ni_ne_remet_le_delai();
+  test_rappel_volume_s_affiche_sans_wifi();
+  test_rappel_volume_ne_remet_pas_le_delai_de_sommeil_a_zero_depuis_l_eveil();
   test_rappel_volume_sous_interpelle_le_bouton_claude_chasse_la_session();
   test_rappel_volume_sans_son_et_n_interrompt_pas_un_son();
   puts("Tous les tests passent.");
