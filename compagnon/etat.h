@@ -11,6 +11,7 @@ const unsigned long DUREE_GIT_PUSH_MS = 3000;
 const unsigned long DUREE_MUSIC_MS = 10000;  // minimum ; plus si deux défilements durent plus longtemps
 const unsigned long DUREE_SILENCE_MS = 3000;  // Rappel silence (ni Morceau ni Vidéo courante)
 const unsigned long DUREE_RAPPEL_CLAUDE_MS = 3000;
+const unsigned long DUREE_RAPPEL_VOLUME_MS = 2000;  // repoussée à chaque mouvement du Potentiomètre
 // Le PC renvoie l'état de lecture (music ou music_stop) toutes les 10 s (hook, hors module) ;
 // sans aucune nouvelle pendant 30 s, le Compagnon oublie le Morceau ou la Vidéo courante (3 renvois manqués).
 const unsigned long OUBLI_MORCEAU_MS = 30000;
@@ -93,7 +94,8 @@ enum Expression {
   EXPR_SANS_CLAUDE, // Rappel Claude sans Session connue : jamais issue d'un Événement
   EXPR_TRAVAILLE,   // Rappel Claude d'une Session qui travaille : jamais issue d'un Événement
   EXPR_ENDORMI,     // point de retour pendant le Sommeil : jamais issue d'un Événement
-  EXPR_VIDEO        // video : temporaire, sans Son, durée de l'Expression musique
+  EXPR_VIDEO,       // video : temporaire, sans Son, durée de l'Expression musique
+  EXPR_VOLUME       // Rappel volume : jamais issue d'un Événement
 };
 
 struct EtatCourant {
@@ -158,6 +160,15 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs);
 // Sans Claude), « │ N sessions » au bord droit de la ligne 1 s'il y a plusieurs Sessions connues.
 // Le dernier appui, sur l'un ou l'autre Bouton, remplace le Rappel en cours.
 bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs);
+
+// Potentiomètre (GPIO 34) : à appeler à chaque tour de loop() avec la lecture brute (0-4095) et l'heure.
+// Fixe le Volume (zones mortes aux butées, hystérésis contre le bruit) ; la première lecture après etatInit
+// le fixe sans rien montrer. Un mouvement net (le Volume change) montre le Rappel volume et repousse
+// son échéance ; renvoie vrai si l'affichage change.
+bool etatPotentiometre(int lectureBrute, unsigned long maintenantMs);
+
+// Volume des Sons : 0 (muet) à 100 (plein). Plein tant qu'aucune lecture n'a eu lieu.
+int etatVolume();
 
 // Expression à afficher : le Rappel s'il y en a un, sinon l'Expression courante.
 const EtatCourant& etatCourant();

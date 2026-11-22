@@ -10,6 +10,8 @@ const int BROCHE_BOUTON = 27;  // entre D27 et GND, lu en INPUT_PULLUP (enfoncé
 
 const int BROCHE_BOUTON_CLAUDE = 26;  // entre D26 et GND, lu comme le Bouton musique
 
+const int BROCHE_POTENTIOMETRE = 34;  // curseur du Potentiomètre (extrémités sur 3V3 et GND, jamais 5 V) ; ADC1, entrée seule
+
 static bool dernierEtatWifi = true;  // forcé à l'opposé au premier tour pour dessiner
 
 // Cadence du redessin périodique : PERIODE_ANIM_MS (etat.h).
@@ -34,6 +36,7 @@ void setup() {
   pinMode(BROCHE_BOUTON, INPUT_PULLUP);
   pinMode(BROCHE_BOUTON_CLAUDE, INPUT_PULLUP);
   etatInit(digitalRead(BROCHE_BOUTON) == LOW, digitalRead(BROCHE_BOUTON_CLAUDE) == LOW);
+  etatPotentiometre(analogRead(BROCHE_POTENTIOMETRE), millis());  // la position au démarrage fixe le Volume
   buzzerInit();
   reseauInit();
   apiInit();
@@ -46,7 +49,8 @@ void loop() {
   aRedessiner |= etatMiseAJour(millis(), reseauConnecte());
   aRedessiner |= etatBouton(digitalRead(BROCHE_BOUTON) == LOW, millis());
   aRedessiner |= etatBoutonClaude(digitalRead(BROCHE_BOUTON_CLAUDE) == LOW, millis());
-  buzzerJouer(etatFrequence(millis()));  // Son courant, sans bloquer la boucle
+  aRedessiner |= etatPotentiometre(analogRead(BROCHE_POTENTIOMETRE), millis());
+  buzzerJouer(etatFrequence(millis()), etatVolume());  // Son courant au Volume courant, sans bloquer la boucle
 
   bool connecte = reseauConnecte();
   if (connecte != dernierEtatWifi) {

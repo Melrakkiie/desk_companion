@@ -222,6 +222,21 @@ static void dessinerSilence(const EtatCourant& e, unsigned long maintenantMs) {
   ecran.drawLine(97, CENTRE_Y + 12, 119, CENTRE_Y - 8, SSD1306_WHITE);
 }
 
+// Rappel volume : Boule immobile (pas de clignement) qui lève les yeux vers le Bandeau, où un haut-parleur
+// et une barre continue disent le Volume (ni texte ni pourcentage)
+static void dessinerVolume(const EtatCourant& e, unsigned long maintenantMs) {
+  (void)e;
+  (void)maintenantMs;
+  bouleCorps(0);
+  bouleYeux(0, false, -3);
+  ecran.fillRect(2, 6, 4, 4, SSD1306_WHITE);  // haut-parleur : caisse (lignes 6 à 9)
+  // cône colonne par colonne, symétrique autour de la caisse (un triangle plein se rastérise de travers)
+  for (int i = 0; i < 4; i++) ecran.drawFastVLine(6 + i, 5 - i, 6 + 2 * i, SSD1306_WHITE);
+  const int x = 20, largeur = 104;
+  ecran.drawRect(x, 3, largeur, 10, SSD1306_WHITE);
+  ecran.fillRect(x + 2, 5, (largeur - 4) * etatVolume() / 100, 6, SSD1306_WHITE);
+}
+
 // Sans Claude (Rappel Claude sans Session connue) : contour vide de la Mascotte, sans yeux ;
 // le Bandeau dit « pas de Claude »
 static void dessinerSansClaude(const EtatCourant& e, unsigned long maintenantMs) {
@@ -290,6 +305,7 @@ void expressionsAfficher(const EtatCourant& e, const char* texteBandeau, unsigne
     case EXPR_PUSH:       dessinerPush(e, maintenantMs); break;
     case EXPR_JEU:        dessinerJeu(e, maintenantMs); break;
     case EXPR_SILENCE:    dessinerSilence(e, maintenantMs); break;
+    case EXPR_VOLUME:     dessinerVolume(e, maintenantMs); break;
     case EXPR_SANS_CLAUDE: dessinerSansClaude(e, maintenantMs); break;
     case EXPR_TRAVAILLE:  dessinerTravaille(e, maintenantMs); break;
     case EXPR_ENDORMI:    dessinerEndormi(e, maintenantMs); break;

@@ -19,6 +19,21 @@ static void oublierSiPerime(unsigned long maintenantMs) {
   if (lectureConnue && maintenantMs - nouvellesLectureMs >= OUBLI_MORCEAU_MS) lectureConnue = false;
 }
 
+// Pose le Rappel (déjà rempli : expression, textes, dureeMs) : temporaire, à partir de maintenant, actif.
+static void poserRappel(unsigned long maintenantMs) {
+  rappel.temporaire = true;
+  rappel.debutMs = maintenantMs;
+  rappelActif = true;
+}
+
+// Potentiomètre : zones mortes (butées exactes malgré le bruit) et seuil d'hystérésis, en unités brutes 0-4095.
+static const int ZONE_MORTE_BRUT = 50;
+static const int SEUIL_BRUIT_BRUT = 40;
+// Dernière lecture retenue (hystérésis) et Volume 0-100.
+static bool potentiometreLu = false;
+static int potentiometreRetenu = 0;
+static int volume = 100;
+
 // Jeu courant : le dernier game reçu, tant qu'il n'est ni arrêté (game_stop) ni oublié.
 static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
 static bool jeuConnu = false;
@@ -265,10 +280,37 @@ jeuConnu = false;
   endormi = false;
   wifiPrecedent = true;
   dernierEvenementMs = 0;
+  potentiometreLu = false;
+  volume = 100;
   memset(sessions, 0, sizeof(sessions));
   // tenu au démarrage : pas de front d'appui
   boutonMusique = {boutonMusiqueEnfonceAuDemarrage, false, 0};
   boutonClaude = {boutonClaudeEnfonceAuDemarrage, false, 0};
+}
+
+int etatVolume() { return volume; }
+
+bool etatPotentiometre(int lectureBrute, unsigned long maintenantMs) {
+  int plein = 4095 - ZONE_MORTE_BRUT;
+  bool zoneMorte = lectureBrute <= ZONE_MORTE_BRUT || lectureBrute >= plein;
+  int ecart = lectureBrute - potentiometreRetenu;
+  if (potentiometreLu && !zoneMorte && ecart > -SEUIL_BRUIT_BRUT && ecart < SEUIL_BRUIT_BRUT) return false;
+  bool premiere = !potentiometreLu;
+  int ancien = volume;
+  potentiometreLu = true;
+  potentiometreRetenu = lectureBrute;
+  if (lectureBrute <= ZONE_MORTE_BRUT) volume = 0;
+  else if (lectureBrute >= plein) volume = 100;
+  else volume = 100 * (lectureBrute - ZONE_MORTE_BRUT) / (plein - ZONE_MORTE_BRUT);
+  // Un mouvement = le Volume change (le bruit en butée ne le change pas) ; ce n'est pas un Événement :
+  // ni réveil ni délai de Sommeil remis à zéro.
+  if (premiere || volume == ancien) return false;
+  rappel.expression = EXPR_VOLUME;
+  rappel.texte[0] = '\0';
+  rappel.ligne2[0] = '\0';
+  rappel.dureeMs = DUREE_RAPPEL_VOLUME_MS;
+  poserRappel(maintenantMs);
+  return true;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
@@ -454,9 +496,7 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs) {
     rappel.ligne2[0] = '\0';
     rappel.dureeMs = DUREE_SILENCE_MS;
   }
-  rappel.temporaire = true;
-  rappel.debutMs = maintenantMs;
-  rappelActif = true;
+  poserRappel(maintenantMs);
   return true;
 }
 
@@ -504,9 +544,7 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     }
   }
   rappel.dureeMs = DUREE_RAPPEL_CLAUDE_MS;
-  rappel.temporaire = true;
-  rappel.debutMs = maintenantMs;
-  rappelActif = true;
+  poserRappel(maintenantMs);
   return true;
 }
 
