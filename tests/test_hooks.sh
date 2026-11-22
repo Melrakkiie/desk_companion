@@ -83,6 +83,7 @@ verifie "Stop avec un sous-agent en cours -> rien envoyé" "$(tache Stop 'Je lan
 verifie "Stop avec une commande de fond seule -> rien envoyé" "$(tache Stop 'Je lance.' '[{"type":"bash","id":"b1"}]')" ''
 verifie "Stop avec background_tasks vide -> claude_done" "$(tache Stop 'Fini.' '[]')" "$FINI"
 verifie "Stop avec background_tasks null -> claude_done" "$(tache Stop 'Fini.' 'null')" "$FINI"
+verifie "Stop avec background_tasks non-tableau -> claude_done" "$(tache Stop 'Fini.' '"x"')" "$FINI"
 verifie "Stop avec seulement des session_crons -> claude_done" "$(tache Stop 'Fini.' '[]' '[{"id":"c1"}]')" "$FINI"
 verifie "Stop sur une question avec des tâches en cours -> claude_waiting" "$(tache Stop 'Tu veux ça ?' '[{"type":"subagent","id":"a1"}]')" "$ATTEND"
 verifie "StopFailure avec des tâches en cours -> rien envoyé" "$(tache StopFailure 'Erreur' '[{"type":"subagent","id":"a1"}]')" ''

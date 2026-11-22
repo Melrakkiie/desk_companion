@@ -37,18 +37,20 @@ question qui t'est adressée, sinon `claude_done`. Critères, un seul suffit :
 - une de ses lignes commence par `needs input:` ;
 - son dernier paragraphe non vide, blocs de code (```) retirés, se termine par `?` (espaces en fin ignorés).
 
-Texte absent ou vide : `claude_done`. `claude_done` (la clochette) ne part que si plus rien ne tourne en arrière-plan :
-si le champ `background_tasks` de l'entrée de `Stop` ou de `StopFailure` est un tableau non vide (sous-agent, commande
-de fond, Monitor, quel qu'en soit le type), le hook n'envoie rien et la Session reste « travaille » ; la clochette
-sonne au tour qui finit une fois la liste vide. Une question en fin de réponse envoie toujours `claude_waiting`, même
-avec des tâches en cours. `session_crons` (tâches planifiées) est ignoré. Champ absent, `null` ou JSON illisible :
-`claude_done` comme avant (version de Claude Code sans le champ). Limite connue : une commande de fond très longue
-(serveur de dev laissé tourner) retarde la clochette tant qu'elle tourne. Limite : pas d'analyse du sens, donc un `?` final qui ne demande rien
+Texte absent ou vide : `claude_done`. Limite : pas d'analyse du sens, donc un `?` final qui ne demande rien
 donne un faux « Hey? » (rare ; l'attente s'efface à ta prochaine saisie).
 Le script attend la réponse du Compagnon : au plus 3 s pour `Stop` et `StopFailure`, 1 s pour tous les autres
 Événements (`SessionEnd` compris). Détachés, le `claude_done` du `Stop` et un `claude_waiting` se perdaient
 (processus des hooks vraisemblablement tués à la sortie de Claude Code, Compagnon lent). Seul le `PostToolUse`
 d'un outil ordinaire (dizaines par minute, autre qu'`AskUserQuestion`) part détaché, sans attente.
+
+`claude_done` (la clochette) ne part que si plus rien ne tourne en arrière-plan : si le champ `background_tasks` de
+l'entrée de `Stop` ou de `StopFailure` est un tableau non vide (sous-agent, commande de fond, Monitor, quel qu'en soit
+le type), le hook n'envoie rien et la Session reste « travaille » ; la clochette sonne au tour qui finit une fois la
+liste vide. Une question en fin de réponse envoie toujours `claude_waiting`, même avec des tâches en cours.
+`session_crons` (tâches planifiées) est ignoré. Champ absent, `null` ou JSON illisible : `claude_done` comme avant
+(version de Claude Code sans le champ). Limite connue : une commande de fond très longue (serveur de dev laissé
+tourner) retarde la clochette tant qu'elle tourne.
 
 `claude_waiting` (« Hey? » puis le projet) part aussi dans ces cas : notification `permission_prompt`
 (autorisation), notification `elicitation_dialog` (saisie demandée par un serveur MCP), et `PreToolUse` de
