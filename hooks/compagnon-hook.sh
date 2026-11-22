@@ -35,11 +35,18 @@ finit_sur_question() {
 # Durée d'attente de la réponse en s ; 0 : envoi détaché. Par défaut le script attend : un envoi détaché
 # se perd (Claude Code tue vraisemblablement les processus du hook à sa sortie, le Compagnon est lent).
 duree_attente_s=$delai_fin_s
+# Du travail tourne-t-il encore en arrière-plan (sous-agent, commande de fond, Monitor) ? Tableau background_tasks
+# non vide ; absent, null ou illisible : non. session_crons (tâches planifiées) ne compte pas.
+fond_en_cours() { [ "$(champ '.background_tasks | if type == "array" then length else 0 end')" -gt 0 ] 2>/dev/null; }
 case "$(champ .hook_event_name)" in
   Stop)
     duree_attente_s=$delai_tour_s
-    if finit_sur_question; then type=claude_waiting; texte=$hey; else type=claude_done; texte=$projet; fi ;;
-  StopFailure) duree_attente_s=$delai_tour_s; type=claude_done; texte=$projet ;;  # tour fini sur une erreur d'API : aucune question
+    if finit_sur_question; then type=claude_waiting; texte=$hey  # une question attend toujours, tâches de fond ou non
+    elif fond_en_cours; then exit 0  # la Session travaille encore : pas de clochette avant la fin de tout
+    else type=claude_done; texte=$projet; fi ;;
+  StopFailure)  # tour fini sur une erreur d'API : aucune question
+    fond_en_cours && exit 0
+    duree_attente_s=$delai_tour_s; type=claude_done; texte=$projet ;;
   Notification)
     type=claude_waiting
     case "$(champ .notification_type)" in

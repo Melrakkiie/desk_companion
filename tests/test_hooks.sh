@@ -74,6 +74,19 @@ verifie "Stop avec bloc de code non fermé contenant ? -> claude_done" "$(stop S
 verifie "Stop avec ? dans un paragraphe non final -> claude_done" "$(stop Stop 'Tu veux ça ?\n\nJ ai fini.')" "$FINI"
 verifie "Stop avec texte vide -> claude_done" "$(stop Stop '')" "$FINI"
 verifie "StopFailure avec ? -> claude_done" "$(stop StopFailure 'Erreur ?')" "$FINI"
+
+# Travail en arrière-plan (background_tasks) : « a fini » exige que plus rien ne tourne.
+# tache <événement> <texte> <background_tasks en JSON> [session_crons en JSON]
+tache() { jq -nc --arg e "$1" --arg m "$(printf '%b' "$2")" --argjson b "$3" --argjson c "${4:-[]}" \
+  '{hook_event_name: $e, session_id: "s1", cwd: "/x/mon_projet", last_assistant_message: $m, background_tasks: $b, session_crons: $c}'; }
+verifie "Stop avec un sous-agent en cours -> rien envoyé" "$(tache Stop 'Je lance.' '[{"type":"subagent","id":"a1"}]')" ''
+verifie "Stop avec une commande de fond seule -> rien envoyé" "$(tache Stop 'Je lance.' '[{"type":"bash","id":"b1"}]')" ''
+verifie "Stop avec background_tasks vide -> claude_done" "$(tache Stop 'Fini.' '[]')" "$FINI"
+verifie "Stop avec background_tasks null -> claude_done" "$(tache Stop 'Fini.' 'null')" "$FINI"
+verifie "Stop avec seulement des session_crons -> claude_done" "$(tache Stop 'Fini.' '[]' '[{"id":"c1"}]')" "$FINI"
+verifie "Stop sur une question avec des tâches en cours -> claude_waiting" "$(tache Stop 'Tu veux ça ?' '[{"type":"subagent","id":"a1"}]')" "$ATTEND"
+verifie "StopFailure avec des tâches en cours -> rien envoyé" "$(tache StopFailure 'Erreur' '[{"type":"subagent","id":"a1"}]')" ''
+verifie "StopFailure avec background_tasks vide -> claude_done" "$(tache StopFailure 'Erreur' '[]')" "$FINI"
 verifie "UserPromptSubmit -> claude_working" \
   '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/x/mon_projet"}' \
   '/event application/json {"type":"claude_working","text":"mon_projet","session":"s1"}'
