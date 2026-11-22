@@ -6,7 +6,8 @@
 
 #include "etat.h"
 
-static const size_t CORPS_MAX = 512;  // octets
+// octets ; 512 refusait des titres réels (emoji, CJK : 3-4 octets par caractère). L'État tronque ensuite.
+static const size_t CORPS_MAX = 2048;
 
 static WebServer serveur(80);
 static bool expressionChangee = false;
@@ -23,7 +24,9 @@ static void traiterEvenement() {
   // shortcut: WebServer lit tout le corps en mémoire avant ce handler ; un corps énorme est
   // refusé ici mais déjà reçu. Acceptable sur réseau domestique.
   if (serveur.clientContentLength() > (int)CORPS_MAX) {
-    repondre(413, "corps trop gros (512 octets max)");
+    char message[48];
+    snprintf(message, sizeof(message), "corps trop gros (%u octets max)", (unsigned)CORPS_MAX);
+    repondre(413, message);
     return;
   }
   const String corps = serveur.arg("plain");

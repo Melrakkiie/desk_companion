@@ -93,6 +93,11 @@ static Session* laPlusRecente(EtatClaude etat, unsigned long maintenantMs) {
   return res;
 }
 
+// La Session affichée par interpelle : celle qui attend la plus récente.
+static bool estAffichee(const Session& s, unsigned long maintenantMs) {
+  return s.etat == CLAUDE_ATTEND && laPlusRecente(CLAUDE_ATTEND, maintenantMs) == &s;
+}
+
 // Fait passer la Session affichée (qui attend la plus récente) à « a fini », projet seul. Faux s'il n'y en a pas.
 static bool chasserSessionAffichee(unsigned long maintenantMs) {
   Session* s = laPlusRecente(CLAUDE_ATTEND, maintenantMs);
@@ -235,7 +240,7 @@ static void retour(unsigned long maintenantMs) {
 // Oublie la Session (claude_end ou oubli après OUBLI_SESSION_MS) ; si c'était la Session affichée,
 // passage au point de retour, sans carillon. Vrai si l'Expression a changé.
 static bool oublierSession(Session& s, unsigned long maintenantMs) {
-  bool affichee = s.etat == CLAUDE_ATTEND && laPlusRecente(CLAUDE_ATTEND, maintenantMs) == &s;
+  bool affichee = estAffichee(s, maintenantMs);
   s.utilisee = false;
   if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
   retour(maintenantMs);
@@ -353,7 +358,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     // de retour (autre Session qui attend, Jeu, Repos), sans carillon. Sinon sans effet (l'API répond 200).
     case EV_CLAUDE_WORKING: {
       Session& s = sessionPour(session, maintenantMs);
-      bool affichee = s.etat == CLAUDE_ATTEND && laPlusRecente(CLAUDE_ATTEND, maintenantMs) == &s;
+      bool affichee = estAffichee(s, maintenantMs);
       majSession(s, CLAUDE_TRAVAILLE, texte, maintenantMs);  // texte gardé pour le Rappel Claude, pas d'affichage direct
       if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
       retour(maintenantMs);
