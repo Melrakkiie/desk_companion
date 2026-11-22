@@ -32,7 +32,8 @@ static bool wifiPrecedent = true;
 
 // Table des Sessions Claude Code : identifiant, État Claude, texte brut du dernier Événement
 // (« libellé\nprojet »), instant du dernier changement. La Session anonyme a l'identifiant "".
-// Pleine, la plus ancienne (changementMs minimal) cède la place à une nouvelle Session.
+// Pleine, la plus ancienne qui n'attend pas cède la place à une nouvelle Session (toutes attendent : la plus ancienne).
+// Les instants se comparent par âge (maintenantMs - changementMs) : millis() repasse à zéro tous les 49,7 jours.
 struct Session {
   bool utilisee;
   char id[SESSION_ID_MAX + 1];
@@ -53,11 +54,16 @@ static Session* sessionConnue(const char* id) {
 static Session& sessionPour(const char* id, unsigned long maintenantMs) {
   if (id == nullptr) id = "";
   if (Session* connue = sessionConnue(id)) return *connue;
+  // Celle qui attend et s'affiche est la plus récente qui attend : jamais choisie, même si toutes attendent.
   Session* libre = nullptr;
-  Session* ancienne = &sessions[0];
+  Session* ancienne = nullptr;
   for (Session& s : sessions) {
     if (!s.utilisee) { if (libre == nullptr) libre = &s; continue; }
-    if (s.changementMs < ancienne->changementMs) ancienne = &s;
+    if (ancienne == nullptr) { ancienne = &s; continue; }
+    bool attend = s.etat == CLAUDE_ATTEND, ancienneAttend = ancienne->etat == CLAUDE_ATTEND;
+    if (attend != ancienneAttend ? ancienneAttend
+                                 : maintenantMs - s.changementMs > maintenantMs - ancienne->changementMs)
+      ancienne = &s;
   }
   Session& s = libre != nullptr ? *libre : *ancienne;
   s.utilisee = true;
@@ -78,20 +84,18 @@ static void majSession(Session& s, EtatClaude etat, const char* texte, unsigned 
 }
 
 // Session dans cet État Claude depuis le plus récent changement, ou nullptr. Égalité d'instant : la dernière de la table.
-static Session* laPlusRecente(EtatClaude etat) {
+static Session* laPlusRecente(EtatClaude etat, unsigned long maintenantMs) {
   Session* res = nullptr;
   for (Session& s : sessions)
-    if (s.utilisee && s.etat == etat && (res == nullptr || s.changementMs >= res->changementMs)) res = &s;
+    if (s.utilisee && s.etat == etat &&
+        (res == nullptr || maintenantMs - s.changementMs <= maintenantMs - res->changementMs))
+      res = &s;
   return res;
-}
-
-static const Session* attenteLaPlusRecente() {
-  return laPlusRecente(CLAUDE_ATTEND);
 }
 
 // Fait passer la Session affichée (qui attend la plus récente) à « a fini », projet seul. Faux s'il n'y en a pas.
 static bool chasserSessionAffichee(unsigned long maintenantMs) {
-  Session* s = laPlusRecente(CLAUDE_ATTEND);
+  Session* s = laPlusRecente(CLAUDE_ATTEND, maintenantMs);
   if (s == nullptr) return false;
   const char* projet = strchr(s->texte, '\n');
   char copie[sizeof(s->texte)];  // copie : majSession réécrit s->texte
@@ -169,7 +173,8 @@ unsigned long etatDureeSon(Son son) {
   return total;
 }
 
-unsigned int etatFrequenceSon(Son son, unsigned long tempsEcouleMs) {
+// Fréquence (Hz) à jouer pour ce Son après tempsEcouleMs ; 0 = silence ou Son terminé.
+static unsigned int etatFrequenceSon(Son son, unsigned long tempsEcouleMs) {
   int n;
   const Note* notes = melodie(son, &n);
   for (int i = 0; i < n; i++) {
@@ -220,7 +225,7 @@ static void jeu(unsigned long maintenantMs) {
 
 // Point de retour : interpelle (Session qui attend la plus récente) > Jeu > Repos.
 static void retour(unsigned long maintenantMs) {
-  const Session* attente = attenteLaPlusRecente();
+  const Session* attente = laPlusRecente(CLAUDE_ATTEND, maintenantMs);
   if (attente != nullptr) installer(EXPR_INTERPELLE, attente->texte, false, maintenantMs, 0);
   else if (jeuConnu) jeu(maintenantMs);
   else if (endormi) installer(EXPR_ENDORMI, nullptr, false, maintenantMs, 0);
@@ -230,7 +235,7 @@ static void retour(unsigned long maintenantMs) {
 // Oublie la Session (claude_end ou oubli après OUBLI_SESSION_MS) ; si c'était la Session affichée,
 // passage au point de retour, sans carillon. Vrai si l'Expression a changé.
 static bool oublierSession(Session& s, unsigned long maintenantMs) {
-  bool affichee = s.etat == CLAUDE_ATTEND && attenteLaPlusRecente() == &s;
+  bool affichee = s.etat == CLAUDE_ATTEND && laPlusRecente(CLAUDE_ATTEND, maintenantMs) == &s;
   s.utilisee = false;
   if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
   retour(maintenantMs);
@@ -348,7 +353,7 @@ static bool recevoir(TypeEvenement type, const char* texte, unsigned long mainte
     // de retour (autre Session qui attend, Jeu, Repos), sans carillon. Sinon sans effet (l'API répond 200).
     case EV_CLAUDE_WORKING: {
       Session& s = sessionPour(session, maintenantMs);
-      bool affichee = s.etat == CLAUDE_ATTEND && attenteLaPlusRecente() == &s;
+      bool affichee = s.etat == CLAUDE_ATTEND && laPlusRecente(CLAUDE_ATTEND, maintenantMs) == &s;
       majSession(s, CLAUDE_TRAVAILLE, texte, maintenantMs);  // texte gardé pour le Rappel Claude, pas d'affichage direct
       if (!affichee || etat.expression != EXPR_INTERPELLE) return false;
       retour(maintenantMs);
@@ -461,10 +466,10 @@ bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs) {
     return true;
   }
 
-  const Session* s = attenteLaPlusRecente();
+  const Session* s = laPlusRecente(CLAUDE_ATTEND, maintenantMs);
   rappel.expression = EXPR_INTERPELLE;
-  if (s == nullptr) { s = laPlusRecente(CLAUDE_TRAVAILLE); rappel.expression = EXPR_TRAVAILLE; }
-  if (s == nullptr) { s = laPlusRecente(CLAUDE_FINI); rappel.expression = EXPR_CONTENT; }
+  if (s == nullptr) { s = laPlusRecente(CLAUDE_TRAVAILLE, maintenantMs); rappel.expression = EXPR_TRAVAILLE; }
+  if (s == nullptr) { s = laPlusRecente(CLAUDE_FINI, maintenantMs); rappel.expression = EXPR_CONTENT; }
   int utilisees = 0;
   for (const Session& t : sessions) if (t.utilisee) utilisees++;
   if (s == nullptr) {

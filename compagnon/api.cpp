@@ -31,10 +31,6 @@ static void traiterEvenement() {
     repondre(400, "corps vide (envoyer du JSON avec Content-Type: application/json)");
     return;
   }
-  if (corps.length() > CORPS_MAX) {
-    repondre(413, "corps trop gros (512 octets max)");
-    return;
-  }
 
   JsonDocument doc;
   if (deserializeJson(doc, corps)) {

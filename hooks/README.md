@@ -67,7 +67,7 @@ Le hook `SessionEnd` envoie `claude_end` (avec `session`) : le Compagnon oublie 
 attendait, l'interpellation passe à la Session suivante qui attend, ou disparaît. `claude_end` d'une Session
 inconnue est sans effet. Pour une Session tuée sans `SessionEnd` (ou un `claude_end` perdu), le Compagnon oublie
 une Session sans aucun Événement depuis 12 h, comme sur `claude_end` ; il ne suit de toute façon que 8 Sessions
-et oublie la plus ancienne à la neuvième.
+et oublie la plus ancienne à la neuvième, en gardant de préférence celles qui attendent.
 
 ```
 curl -X POST -H 'Content-Type: application/json' -d '{"type":"claude_end","text":"projet","session":"<session_id>"}' http://compagnon.local/event
