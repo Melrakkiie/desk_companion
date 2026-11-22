@@ -632,6 +632,52 @@ static void test_bouton_tenu_au_demarrage_sans_rappel() {
   assert(etatCourant().expression == EXPR_SILENCE);
 }
 
+// ---- Potentiomètre et Volume (ticket #82) ----
+
+static void test_volume_premiere_lecture_fixe_le_volume_proportionnel() {
+  etatInit();
+  assert(!etatPotentiometre(2048, 100));  // rien de nouveau à l'écran
+  assert(etatVolume() >= 49 && etatVolume() <= 51);
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+static void test_volume_zones_mortes_butees_exactes_malgre_le_bruit() {
+  etatInit();
+  etatPotentiometre(5, 100);
+  assert(etatVolume() == 0);
+  etatPotentiometre(30, 110);
+  assert(etatVolume() == 0);
+  etatPotentiometre(4090, 120);
+  assert(etatVolume() == 100);
+  etatPotentiometre(4060, 130);
+  assert(etatVolume() == 100);
+  etatPotentiometre(2000, 140);
+  etatPotentiometre(3, 150);  // retour en butée basse depuis le milieu
+  assert(etatVolume() == 0);
+}
+
+static void test_volume_bruit_ignore_variation_nette_prise_en_compte() {
+  etatInit();
+  etatPotentiometre(2048, 100);
+  int v = etatVolume();
+  etatPotentiometre(2052, 110);
+  etatPotentiometre(2043, 120);
+  etatPotentiometre(2055, 130);
+  assert(etatVolume() == v);
+  etatPotentiometre(3000, 140);
+  assert(etatVolume() > v + 15);
+  etatPotentiometre(1000, 150);
+  assert(etatVolume() < v - 15);
+}
+
+static void test_volume_butee_de_pres_sans_sauter_la_zone_morte() {
+  etatInit();
+  etatPotentiometre(100, 100);  // vol faible mais > 0
+  assert(etatVolume() > 0);
+  etatPotentiometre(20, 110);   // écart < seuil mais en zone morte : 0 exact
+  assert(etatVolume() == 0);
+}
+
 static void test_bouton_nouvel_appui_relance_le_rappel() {
   etatInit();
   etatBouton(true, 1000);
@@ -1521,6 +1567,10 @@ int main() {
   test_pas_de_sommeil_sans_wifi();
   test_wifi_perdu_pendant_le_sommeil_reveille_sur_repos();
   test_sommeil_2_min_apres_le_retour_du_wifi();
+  test_volume_premiere_lecture_fixe_le_volume_proportionnel();
+  test_volume_zones_mortes_butees_exactes_malgre_le_bruit();
+  test_volume_bruit_ignore_variation_nette_prise_en_compte();
+  test_volume_butee_de_pres_sans_sauter_la_zone_morte();
   puts("Tous les tests passent.");
   return 0;
 }

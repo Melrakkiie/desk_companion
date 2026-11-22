@@ -19,6 +19,11 @@ static void oublierSiPerime(unsigned long maintenantMs) {
   if (lectureConnue && maintenantMs - nouvellesLectureMs >= OUBLI_MORCEAU_MS) lectureConnue = false;
 }
 
+// Potentiomètre : dernière lecture retenue (hystérésis) et Volume 0-100.
+static bool potentiometreLu = false;
+static int potentiometreRetenu = 0;
+static int volume = 100;
+
 // Jeu courant : le dernier game reçu, tant qu'il n'est ni arrêté (game_stop) ni oublié.
 static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
 static bool jeuConnu = false;
@@ -265,10 +270,31 @@ jeuConnu = false;
   endormi = false;
   wifiPrecedent = true;
   dernierEvenementMs = 0;
+  potentiometreLu = false;
+  volume = 100;
   memset(sessions, 0, sizeof(sessions));
   // tenu au démarrage : pas de front d'appui
   boutonMusique = {boutonMusiqueEnfonceAuDemarrage, false, 0};
   boutonClaude = {boutonClaudeEnfonceAuDemarrage, false, 0};
+}
+
+// Potentiomètre : zones mortes (butées exactes malgré le bruit) et seuil d'hystérésis, en unités brutes 0-4095.
+static const int ZONE_MORTE_BRUT = 50;
+static const int SEUIL_BRUIT_BRUT = 40;
+
+int etatVolume() { return volume; }
+
+bool etatPotentiometre(int lectureBrute, unsigned long /*maintenantMs*/) {
+  int plein = 4095 - ZONE_MORTE_BRUT;
+  bool zoneMorte = lectureBrute <= ZONE_MORTE_BRUT || lectureBrute >= plein;
+  int ecart = lectureBrute - potentiometreRetenu;
+  if (potentiometreLu && !zoneMorte && ecart > -SEUIL_BRUIT_BRUT && ecart < SEUIL_BRUIT_BRUT) return false;
+  potentiometreLu = true;
+  potentiometreRetenu = lectureBrute;
+  if (lectureBrute <= ZONE_MORTE_BRUT) volume = 0;
+  else if (lectureBrute >= plein) volume = 100;
+  else volume = 100 * (lectureBrute - ZONE_MORTE_BRUT) / (plein - ZONE_MORTE_BRUT);
+  return false;
 }
 
 bool etatTypeDepuisNom(const char* nom, TypeEvenement* type) {
