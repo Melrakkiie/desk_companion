@@ -118,9 +118,6 @@ enum Son { SON_AUCUN, SON_FANFARE, SON_CARILLON, SON_CLOCHETTE };
 // Durée totale d'un Son (ms) ; 0 pour SON_AUCUN.
 unsigned long etatDureeSon(Son son);
 
-// Fréquence (Hz) à jouer pour ce Son après tempsEcouleMs ; 0 = silence ou Son terminé.
-unsigned int etatFrequenceSon(Son son, unsigned long tempsEcouleMs);
-
 // Son en cours (ou terminé : seule la fréquence 0 le dit) ; démarré par claude_done, claude_waiting et git_push,
 // jamais interrompu par les autres Événements.
 Son etatSonCourant();
@@ -136,7 +133,7 @@ void etatInit(bool boutonMusiqueEnfonceAuDemarrage = false, bool boutonClaudeEnf
 // État Claude d'une Session (voir GLOSSARY.md).
 enum EtatClaude { CLAUDE_ATTEND, CLAUDE_TRAVAILLE, CLAUDE_FINI };
 
-const int SESSIONS_MAX = 8;       // taille de la table des Sessions ; la plus ancienne cède la place
+const int SESSIONS_MAX = 8;       // taille de la table des Sessions ; la plus ancienne qui n'attend pas cède la place
 const int SESSION_ID_MAX = 40;    // longueur conservée de l'identifiant (le reste est tronqué)
 
 // Applique un Événement. Renvoie vrai si l'Expression a changé.

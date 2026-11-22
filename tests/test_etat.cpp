@@ -876,16 +876,41 @@ static void test_end_nomme_reconnu_par_l_api() {
   assert(etatTypeDepuisNom("claude_end", &t) && t == EV_CLAUDE_END);
 }
 
-static void test_eviction_d_une_neuvieme_session_chasse_la_plus_ancienne_meme_non_affichee() {
+// s0 attend, s1..s7 travaillent : la table est pleine.
+static void huit_sessions_dont_s0_attend() {
   etatInit();
   char id[8];
-  for (int i = 0; i < 8; i++) {  // s0 attend, les autres travaillent
+  for (int i = 0; i < 8; i++) {
     snprintf(id, sizeof id, "s%d", i);
     etatRecevoir(i == 0 ? EV_CLAUDE_WAITING : EV_CLAUDE_WORKING, i == 0 ? "A" : "x", 100 + i, nullptr, id);
   }
-  etatRecevoir(EV_CLAUDE_WAITING, "B", 500, nullptr, "s8");  // neuvième : chasse s0
+}
+
+static void test_eviction_d_une_neuvieme_session_garde_celle_qui_attend() {
+  huit_sessions_dont_s0_attend();
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 500, nullptr, "s8");  // neuvième : chasse s1, pas s0
   assert(etatRecevoir(EV_CLAUDE_WORKING, "x", 600, nullptr, "s8"));
-  assert(etatCourant().expression == EXPR_REPOS);  // s0 oubliée, pas de retour à "A"
+  assert(etatCourant().expression == EXPR_INTERPELLE);  // s0 attend toujours
+  assert(strcmp(etatCourant().texte, "A") == 0);
+}
+
+static void test_eviction_ne_fige_pas_l_interpellation_affichee() {
+  huit_sessions_dont_s0_attend();
+  assert(!etatRecevoir(EV_CLAUDE_WORKING, "x", 500, nullptr, "s8"));  // neuvième : chasse s1
+  assert(strcmp(etatCourant().texte, "A") == 0);
+  assert(etatRecevoir(EV_CLAUDE_WORKING, "x", 600, nullptr, "s0"));  // réponse à s0 : fin de l'attente
+  assert(etatCourant().expression == EXPR_REPOS);
+}
+
+// millis() repasse à zéro : « a » attend juste avant, « b » juste après ; « b » est la plus récente.
+static void test_sessions_ordonnees_par_age_a_travers_le_retour_a_zero() {
+  etatInit();
+  const unsigned long avant = (unsigned long)-1 - 10;
+  etatRecevoir(EV_CLAUDE_WAITING, "A", avant, nullptr, "a");
+  etatRecevoir(EV_CLAUDE_WAITING, "B", 5, nullptr, "b");
+  assert(strcmp(etatCourant().texte, "B") == 0);
+  assert(etatBoutonClaude(true, 10));  // chasse la Session affichée, b
+  assert(strcmp(etatCourant().texte, "A") == 0);
 }
 
 static void test_attente_ne_disparait_pas_avec_le_temps_meme_a_plusieurs() {
@@ -1399,7 +1424,9 @@ int main() {
   test_session_affichee_muette_12h_retour_au_repos();
   test_end_ne_consomme_pas_de_place_dans_la_table();
   test_end_nomme_reconnu_par_l_api();
-  test_eviction_d_une_neuvieme_session_chasse_la_plus_ancienne_meme_non_affichee();
+  test_eviction_d_une_neuvieme_session_garde_celle_qui_attend();
+  test_eviction_ne_fige_pas_l_interpellation_affichee();
+  test_sessions_ordonnees_par_age_a_travers_le_retour_a_zero();
   test_attente_ne_disparait_pas_avec_le_temps_meme_a_plusieurs();
   test_sessions_working_d_une_autre_ne_coupe_pas_l_attente();
   test_sessions_done_d_une_autre_content_puis_retour_a_l_attente();
