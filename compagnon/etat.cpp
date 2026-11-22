@@ -19,6 +19,11 @@ static void oublierSiPerime(unsigned long maintenantMs) {
   if (lectureConnue && maintenantMs - nouvellesLectureMs >= OUBLI_MORCEAU_MS) lectureConnue = false;
 }
 
+// Potentiomètre : dernière lecture retenue (hystérésis) et Volume 0-100.
+static bool potentiometreLu = false;
+static int potentiometreRetenu = 0;
+static int volume = 100;
+
 // Jeu courant : le dernier game reçu, tant qu'il n'est ni arrêté (game_stop) ni oublié.
 static char jeuNom[TEXTE_MAX + 1];  // déjà en CP437, une seule ligne
 static bool jeuConnu = false;
@@ -276,9 +281,6 @@ jeuConnu = false;
 // Potentiomètre : zones mortes (butées exactes malgré le bruit) et seuil d'hystérésis, en unités brutes 0-4095.
 static const int ZONE_MORTE_BRUT = 50;
 static const int SEUIL_BRUIT_BRUT = 40;
-static bool potentiometreLu = false;
-static int potentiometreRetenu = 0;
-static int volume = 100;
 
 int etatVolume() { return volume; }
 
