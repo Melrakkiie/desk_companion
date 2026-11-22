@@ -4,6 +4,6 @@
 // À appeler une fois dans setup().
 void buzzerInit();
 
-// À appeler à chaque tour de loop() avec la fréquence voulue (0 = silence).
-// Ne touche au PWM que si la fréquence change ; ne bloque jamais.
-void buzzerJouer(unsigned int frequenceHz);
+// À appeler à chaque tour de loop() avec la fréquence voulue (0 = silence) et le Volume (0-100 ; 0 = silence total).
+// Ne touche au PWM que si la fréquence ou le Volume change ; ne bloque jamais.
+void buzzerJouer(unsigned int frequenceHz, int volume);

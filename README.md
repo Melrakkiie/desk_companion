@@ -60,6 +60,7 @@ The full domain vocabulary and rules live in [`GLOSSARY.md`](GLOSSARY.md) (Frenc
 | ESP32 dev board | — |
 | SSD1306 OLED 128×64, yellow/blue, I²C (`0x3C`) | SDA → GPIO 21, SCL → GPIO 22 |
 | Passive buzzer | GPIO 18 |
+| 10 kΩ potentiometer (volume) | ends → 3V3 and GND (never 5 V), wiper → GPIO 34 |
 | Music button | GPIO 27 ↔ GND (internal pull-up) |
 | Claude button | GPIO 26 ↔ GND (internal pull-up) |
 
