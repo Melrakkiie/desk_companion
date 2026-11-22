@@ -24,8 +24,8 @@ everyday, and **the Mascot**, Claude Code's pixel-art critter, for everything Cl
 | **Idle**: smiles and blinks now and then. The banner only speaks up if Wi-Fi drops. | **Music**: dances between bouncing notes; title and artist scroll in the banner. | **Video**: wide-eyed, stares at a small screen with a ▶; title and channel scroll in the banner. |
 | <img src="docs/screens/push.gif" width="260"> | <img src="docs/screens/game.gif" width="260"> | <img src="docs/screens/no_music.gif" width="260"> |
 | **Git push**: looks up in awe as an arrow flies, with a victory fanfare. | **Gaming**: gamer headset on, focused frown, controller in hand. Replaces Idle while a Steam or Lutris game runs. | **Silence**: music button pressed while no track or video plays ("Silence radio"). |
-| <img src="docs/screens/asleep.gif" width="260"> | | |
-| **Asleep**: after 2 minutes with no event from any PC. Eyes closed, "z"s rising. The music button shows "Gros dodo temps". | | |
+| <img src="docs/screens/asleep.gif" width="260"> | <img src="docs/screens/volume.gif" width="260"> | |
+| **Asleep**: after 2 minutes with no event from any PC. Eyes closed, "z"s rising. The music button shows "Gros dodo temps". | **Volume**: turning the knob. Looks up at a speaker and a bar that fills with the volume; empty means muted. | |
 
 ### Claude Code
 
@@ -45,6 +45,9 @@ everyday, and **the Mascot**, Claude Code's pixel-art critter, for everything Cl
 - **Two buttons** show a quick reminder on top of the current screen, silently: the **music button**
   shows the current track or video (or *Silence*), the **Claude button** shows the most urgent session
   (waiting > working > done, or *No Claude*).
+- **The volume knob** sets the volume of every tune, from muted at one end to full at the other, even
+  for a tune already playing. Turning it shows *Volume* on top of the current screen while it moves and
+  for 2 s after; it doesn't wake the companion up.
 - Up to **8 Claude sessions** are tracked in parallel; a session silent for 12 h is forgotten.
 - Only one thing plays at a time: a new track replaces the current video and vice versa. The PC tells
   them apart by the address of what plays (YouTube, Twitch, Netflix…, or a local video file → video;
