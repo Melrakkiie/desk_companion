@@ -162,12 +162,12 @@ bool etatBouton(bool enfonce, unsigned long maintenantMs);
 bool etatBoutonClaude(bool enfonce, unsigned long maintenantMs);
 
 // Potentiomètre (GPIO 34) : à appeler à chaque tour de loop() avec la lecture brute (0-4095) et l'heure.
-// Fixe le Volume (zones mortes aux butées, hystérésis contre le bruit) ; la première lecture après etatInit
-// le fixe sans rien montrer. Un mouvement net (le Volume change) montre le Rappel volume et repousse
+// Fixe le Volume par paliers de 10, avec une marge contre le bruit ; la première lecture après etatInit
+// le fixe sans rien montrer. Un mouvement net (le Volume change de palier) montre le Rappel volume et repousse
 // son échéance ; renvoie vrai si l'affichage change.
 bool etatPotentiometre(int lectureBrute, unsigned long maintenantMs);
 
-// Volume des Sons : 0 (muet) à 100 (plein). Plein tant qu'aucune lecture n'a eu lieu.
+// Volume des Sons : 0 (muet) à 100 (plein), par pas de 10. Plein tant qu'aucune lecture n'a eu lieu.
 int etatVolume();
 
 // Expression à afficher : le Rappel s'il y en a un, sinon l'Expression courante.

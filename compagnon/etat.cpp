@@ -1,5 +1,6 @@
 #include "etat.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static EtatCourant etat;  // l'Expression courante, que le Rappel recouvre sans la toucher
@@ -26,12 +27,12 @@ static void poserRappel(unsigned long maintenantMs) {
   rappelActif = true;
 }
 
-// Potentiomètre : zones mortes (butées exactes malgré le bruit) et seuil d'hystérésis, en unités brutes 0-4095.
-static const int ZONE_MORTE_BRUT = 50;
-static const int SEUIL_BRUIT_BRUT = 40;
-// Dernière lecture retenue (hystérésis) et Volume 0-100.
+// Potentiomètre : lecture brute 0-4095, Volume par paliers de 10 (0 = muet, 100 = plein).
+// On ne quitte un palier que si la lecture s'éloigne de son centre d'un demi-palier plus MARGE_BRUIT_BRUT :
+// le bruit mesuré sur le montage (pics de ±60 au repos) ne fait jamais basculer, même à cheval sur une frontière.
+static const int PLEINE_ECHELLE_BRUT = 4095;
+static const int MARGE_BRUIT_BRUT = 100;
 static bool potentiometreLu = false;
-static int potentiometreRetenu = 0;
 static int volume = 100;
 
 // Jeu courant : le dernier game reçu, tant qu'il n'est ni arrêté (game_stop) ni oublié.
@@ -291,18 +292,13 @@ jeuConnu = false;
 int etatVolume() { return volume; }
 
 bool etatPotentiometre(int lectureBrute, unsigned long maintenantMs) {
-  int plein = 4095 - ZONE_MORTE_BRUT;
-  bool zoneMorte = lectureBrute <= ZONE_MORTE_BRUT || lectureBrute >= plein;
-  int ecart = lectureBrute - potentiometreRetenu;
-  if (potentiometreLu && !zoneMorte && ecart > -SEUIL_BRUIT_BRUT && ecart < SEUIL_BRUIT_BRUT) return false;
+  int centre = volume / 10 * PLEINE_ECHELLE_BRUT / 10;  // centre du palier courant
+  if (potentiometreLu && abs(lectureBrute - centre) <= PLEINE_ECHELLE_BRUT / 20 + MARGE_BRUIT_BRUT) return false;
   bool premiere = !potentiometreLu;
   int ancien = volume;
   potentiometreLu = true;
-  potentiometreRetenu = lectureBrute;
-  if (lectureBrute <= ZONE_MORTE_BRUT) volume = 0;
-  else if (lectureBrute >= plein) volume = 100;
-  else volume = 100 * (lectureBrute - ZONE_MORTE_BRUT) / (plein - ZONE_MORTE_BRUT);
-  // Un mouvement = le Volume change (le bruit en butée ne le change pas) ; ce n'est pas un Événement :
+  volume = (lectureBrute * 10 + PLEINE_ECHELLE_BRUT / 2) / PLEINE_ECHELLE_BRUT * 10;  // palier le plus proche
+  // Un mouvement = le Volume change de palier ; ce n'est pas un Événement :
   // ni réveil ni délai de Sommeil remis à zéro.
   if (premiere || volume == ancien) return false;
   rappel.expression = EXPR_VOLUME;
